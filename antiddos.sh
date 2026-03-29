@@ -98,6 +98,8 @@ iptables -A INPUT -j DROP # Drop TẤT CẢ TCP/UDP không thuộc danh sách ho
 echo "[6/6] Định hình màng chắn chống DDoS Minecraft (UDP)..."
 
 # Xoá rác luật cũ nếu đã từng cài
+while iptables -D DOCKER-USER -s 172.16.0.0/12 -j RETURN 2>/dev/null; do :; done
+while iptables -D DOCKER-USER -m state --state ESTABLISHED,RELATED -j RETURN 2>/dev/null; do :; done
 while iptables -D DOCKER-USER -p udp -m set ! --match-set allow_countries src -j DROP 2>/dev/null; do :; done
 while iptables -D DOCKER-USER -p udp -m set --match-set allow_countries src -m connlimit --connlimit-above 10 -j DROP 2>/dev/null; do :; done
 while iptables -D DOCKER-USER -p udp -m set --match-set allow_countries src -m hashlimit --hashlimit-upto 30/sec --hashlimit-burst 50 --hashlimit-mode srcip --hashlimit-name udp_ratelimit -j RETURN 2>/dev/null; do :; done
@@ -112,6 +114,11 @@ iptables -I DOCKER-USER 1 -p udp -m set --match-set allow_countries src -m hashl
 iptables -I DOCKER-USER 1 -p udp -m set --match-set allow_countries src -m connlimit --connlimit-above 10 -j DROP
 # 1. Chặn IP ngoại quốc vĩnh viễn (UDP)
 iptables -I DOCKER-USER 1 -p udp -m set ! --match-set allow_countries src -j DROP
+
+# --- BẢO VỆ GIAO TIẾP NỘI BỘ MẠNG DOCKER PTERODACTYL (NẰM TRÊN CÙNG) ---
+# Cực kỳ quan trọng để Server có thể kết nối DNS UDP ra quốc tế tải file Mojang
+iptables -I DOCKER-USER 1 -s 172.16.0.0/12 -j RETURN
+iptables -I DOCKER-USER 1 -m state --state ESTABLISHED,RELATED -j RETURN
 
 # Luôn cho phép Output 
 iptables -I OUTPUT 1 -j ACCEPT
