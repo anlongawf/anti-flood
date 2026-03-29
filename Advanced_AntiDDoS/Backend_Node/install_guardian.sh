@@ -30,6 +30,7 @@ EOF
 # Nạp service vào lõi hệ thống
 systemctl daemon-reload
 systemctl enable antiddos-guardian.service
+systemctl start antiddos-guardian.service
 
 echo -e "\033[1;32m[+] SIÊU THÀNH CÔNG! Kể từ giây phút này...\033[0m"
 echo "Bất kỳ thao tác Restart Docker nào của Pterodactyl bôi xóa Firewall"
