@@ -84,18 +84,26 @@ fi
 # 5. CẤU HÌNH IPTABLES HOST (INPUT) VÀ TỰ DÒ CỔNG TCP
 echo "[5/6] Tự động đọc và bảo vệ Cổng (Port) hiện tại..."
 
-# Lỗ hổng / Loopback
+# [QUAN TRỌNG] Xóa sạch các quy tắc cũ hoàn toàn trước khi nạp mới
+iptables -F INPUT
+
+# [QUY TẮC VÀNG] Ưu tiên phản hồi từ các kết nối đã thiết lập (Skins, Updates, DNS)
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Lỗ hổng / Loopback / Nội bộ
 iptables -A INPUT -i lo -j ACCEPT
 iptables -A INPUT -s 127.0.0.0/8 -j ACCEPT
 iptables -A INPUT -s 172.16.0.0/12 -j ACCEPT    # Docker Network
 iptables -A INPUT -s 100.64.0.0/10 -j ACCEPT     # Tailscale Network
 
-# --- BẢO TRÌ DNS CHO HOST & DOCKER (CỰC KỲ QUAN TRỌNG) ---
-iptables -A INPUT -p udp --dport 53 -j ACCEPT
-iptables -A INPUT -p udp --sport 53 -j ACCEPT
-iptables -A INPUT -p tcp --dport 53 -j ACCEPT
-
-iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+# --- BẢO TRÌ DNS & DOWNLOAD (CỰC KỲ QUAN TRỌNG CHO PLUGIN) ---
+# DNS (53), HTTP (80), HTTPS (443), NTP (123)
+for svc_port in 53 80 443 123; do
+    iptables -A INPUT -p udp --sport "$svc_port" -j ACCEPT
+    iptables -A INPUT -p tcp --sport "$svc_port" -j ACCEPT
+    iptables -A INPUT -p udp --dport "$svc_port" -j ACCEPT
+    iptables -A INPUT -p tcp --dport "$svc_port" -j ACCEPT
+done
 
 # [ĐỀ XUẤT] Chặn các kết nối DỊ TẬT
 iptables -A INPUT -m conntrack --ctstate INVALID -j DROP
@@ -134,9 +142,13 @@ iptables -F DOCKER-USER 2>/dev/null
 iptables -A DOCKER-USER -m state --state ESTABLISHED,RELATED -j RETURN
 iptables -A DOCKER-USER -s 172.16.0.0/12 -j RETURN
 
-# 2. MỞ KHÓA DNS CHO DOCKER (Không để UnknownHostException)
-iptables -A DOCKER-USER -p udp --dport 53 -j RETURN
-iptables -A DOCKER-USER -p udp --sport 53 -j RETURN
+# 2. MỞ KHÓA DNS & DOWNLOAD CHO DOCKER (SkinsRestorer, PlaceholderAPI)
+for svc_port in 53 80 443 123; do
+    iptables -A DOCKER-USER -p udp --dport "$svc_port" -j RETURN
+    iptables -A DOCKER-USER -p udp --sport "$svc_port" -j RETURN
+    iptables -A DOCKER-USER -p tcp --dport "$svc_port" -j RETURN
+    iptables -A DOCKER-USER -p tcp --sport "$svc_port" -j RETURN
+done
 
 # 3. CHỐNG SYN FLOOD & TCP STATE ANOMALY (Toàn bộ TCP)
 iptables -A DOCKER-USER -p tcp ! --syn -m state --state NEW -j DROP 
