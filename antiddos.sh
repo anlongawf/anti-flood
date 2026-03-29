@@ -69,12 +69,17 @@ echo "$FAILSAFE_PID" > /tmp/antiddos_failsafe.pid
 # 5. CẤU HÌNH IPTABLES HOST (INPUT) VÀ TỰ DÒ CỔNG TCP
 echo "[5/6] Tự động đọc và bảo vệ Cổng (Port) hiện tại..."
 
-iptables -F INPUT
-
 # Lỗ hổng / Loopback
+iptables -A INPUT -i lo -j ACCEPT
 iptables -A INPUT -s 127.0.0.0/8 -j ACCEPT
 iptables -A INPUT -s 172.16.0.0/12 -j ACCEPT    # Docker Network
 iptables -A INPUT -s 100.64.0.0/10 -j ACCEPT     # Tailscale Network
+
+# --- BẢO TRÌ DNS CHO HOST & DOCKER (CỰC KỲ QUAN TRỌNG) ---
+iptables -A INPUT -p udp --dport 53 -j ACCEPT
+iptables -A INPUT -p udp --sport 53 -j ACCEPT
+iptables -A INPUT -p tcp --dport 53 -j ACCEPT
+
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 # [ĐỀ XUẤT] Chặn các kết nối DỊ TẬT
@@ -114,12 +119,16 @@ iptables -F DOCKER-USER 2>/dev/null
 iptables -A DOCKER-USER -m state --state ESTABLISHED,RELATED -j RETURN
 iptables -A DOCKER-USER -s 172.16.0.0/12 -j RETURN
 
-# 2. CHỐNG SYN FLOOD & TCP STATE ANOMALY (Toàn bộ TCP)
+# 2. MỞ KHÓA DNS CHO DOCKER (Không để UnknownHostException)
+iptables -A DOCKER-USER -p udp --dport 53 -j RETURN
+iptables -A DOCKER-USER -p udp --sport 53 -j RETURN
+
+# 3. CHỐNG SYN FLOOD & TCP STATE ANOMALY (Toàn bộ TCP)
 iptables -A DOCKER-USER -p tcp ! --syn -m state --state NEW -j DROP 
 iptables -A DOCKER-USER -p tcp --syn -m hashlimit --hashlimit-upto 50/sec --hashlimit-burst 100 --hashlimit-mode srcip --hashlimit-name tcp_syn_limit -j RETURN
 iptables -A DOCKER-USER -p tcp --syn -j DROP
 
-# 3. BẢO VỆ RIÊNG CHO CÁC PORT MINECRAFT TCP
+# 4. BẢO VỆ RIÊNG CHO CÁC PORT MINECRAFT TCP
 for port in $MC_TCP_PORTS; do
     echo "      -> Cài giáp TCP Minecraft Port: $port"
     # Chặn IP ngoại quốc
@@ -130,16 +139,21 @@ for port in $MC_TCP_PORTS; do
     iptables -A DOCKER-USER -p tcp --dport "$port" -j RETURN
 done
 
-# 4. BẢO VỆ MINECRAFT UDP (BEDROCK)
+# 5. BẢO VỆ MINECRAFT UDP (BEDROCK)
 echo "      -> Cài giáp UDP Minecraft..."
-# Chặn IP ngoại quốc (UDP)
-iptables -A DOCKER-USER -p udp -m set ! --match-set allow_countries src -j DROP
-# Giới hạn 10 luồng UDP/IP
-iptables -A DOCKER-USER -p udp -m set --match-set allow_countries src -m connlimit --connlimit-above 10 -j DROP
-# Rate limit 30 packet/giây
-iptables -A DOCKER-USER -p udp -m set --match-set allow_countries src -m hashlimit --hashlimit-upto 30/sec --hashlimit-burst 50 --hashlimit-mode srcip --hashlimit-name udp_ratelimit -j RETURN
+
+# Dò tìm các port UDP đang Map của Docker (thường là 19132)
+MC_UDP_PORTS=$(docker ps --format '{{.Ports}}' 2>/dev/null | grep -oP '\d+(?=/udp)' | grep -v '53' | sort -n | uniq | xargs | tr ' ' ',')
+[ -z "$MC_UDP_PORTS" ] && MC_UDP_PORTS="19132"
+
+# CHỈ CHẶN IP NGOẠI QUỐC VÀO CÁC PORT GAME UDP (Để không chặn nhầm DNS)
+iptables -A DOCKER-USER -p udp -m multiport --dports "$MC_UDP_PORTS" -m set ! --match-set allow_countries src -j DROP
+# Giới hạn 10 luồng UDP/IP cho Game
+iptables -A DOCKER-USER -p udp -m multiport --dports "$MC_UDP_PORTS" -m set --match-set allow_countries src -m connlimit --connlimit-above 10 -j DROP
+# Rate limit 30 packet/giây cho Game
+iptables -A DOCKER-USER -p udp -m multiport --dports "$MC_UDP_PORTS" -m set --match-set allow_countries src -m hashlimit --hashlimit-upto 30/sec --hashlimit-burst 50 --hashlimit-mode srcip --hashlimit-name udp_ratelimit -j RETURN
 # Khi quá tải -> Drop
-iptables -A DOCKER-USER -p udp -m set --match-set allow_countries src -j DROP
+iptables -A DOCKER-USER -p udp -m multiport --dports "$MC_UDP_PORTS" -m set --match-set allow_countries src -j DROP
 
 
 # Luôn cho phép Output 
