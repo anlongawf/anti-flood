@@ -10,19 +10,21 @@ echo -e "\033[1;36m[+] Đang cài đặt Kẻ Giác Ngộ (Systemd Guardian) cho
 
 # Tự động dò đường dẫn tuyệt đối (Cực kỳ chính xác cho VPS)
 PARENT_DIR="$(cd "$(dirname "$(readlink -f "$0")")/../../" && pwd)"
-SCRIPT_PATH="$PARENT_DIR/antiddos.sh"
+GUARDIAN_SCRIPT="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/guardian.sh"
+chmod +x "$GUARDIAN_SCRIPT"
 
 cat << EOF > /etc/systemd/system/antiddos-guardian.service
 [Unit]
-Description=Bảo Vệ Tường Lửa Anti-DDoS Đè Lên Docker (DOCKER-USER Guardian)
+Description=Cảnh Vệ Anti-DDoS Thông Minh (Theo Dõi Port 10 Giây/Lần)
 After=docker.service network-online.target
 Requires=docker.service
 
 [Service]
-Type=oneshot
-# Ngay khi Docker xong, chạy Script vá lỗi bảo mật này:
-ExecStart=/bin/bash $SCRIPT_PATH
-RemainAfterExit=yes
+# Chạy ở chế độ nền liên tục:
+Type=simple
+ExecStart=/bin/bash $GUARDIAN_SCRIPT
+Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
@@ -34,5 +36,6 @@ systemctl enable antiddos-guardian.service
 systemctl start antiddos-guardian.service
 
 echo -e "\033[1;32m[+] SIÊU THÀNH CÔNG! Kể từ giây phút này...\033[0m"
-echo "Bất kỳ thao tác Restart Docker nào của Pterodactyl bôi xóa Firewall"
-echo "Cảnh Vệ sẽ lập tức tự động Tát Docker qua một bên và khôi phục lá chắn."
+echo "Cảnh Vệ (Guardian) sẽ chạy ngầm và quét Port 10 giây một lần."
+echo "Bạn không cần phải chạy lại Script mỗi khi tạo Server Minecraft mới nữa."
+echo "Cảnh Vệ sẽ tự động phát hiện và áp dụng lá chắn ngay lập tức."

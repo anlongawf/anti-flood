@@ -9,8 +9,16 @@
 
 echo -e "\033[1;32m[+] BẤT ĐẦU CÀI ĐẶT CÔNG NGHỆ ANTI-DDOS MỚI NHẤT...\033[0m"
 
+# KIỂM TRA CHẾ ĐỘ CHẠY (Bình thường hay --fast cho Guardian)
+FAST_MODE=false
+if [[ "$1" == "--fast" ]]; then
+    FAST_MODE=true
+    echo -e "\033[1;33m[!] CHẠY CHẾ ĐỘ --FAST: Bỏ qua cài đặt & cập nhật IP các quốc gia.\033[0m"
+fi
+
 # 1. TỐI ƯU KERNEL SYSCTL LỚP MẠNG CỐT LÕI (Chống TCP SYN Flood & Mở Rộng Bảng Đệm)
 echo "[1/6] Đang tiến hành ép xung Nhân Linux (Tuning Sysctl TCP/UDP Kernel)..."
+if [ "$FAST_MODE" = false ]; then
 cat <<EOF > /etc/sysctl.d/99-antiddos-mc.conf
 # [CẤU HÌNH LIỀU THUỐC TRỊ BỆNH SYN FLOOD]
 net.ipv4.tcp_syncookies=1
@@ -28,14 +36,18 @@ net.netfilter.nf_conntrack_udp_timeout=10
 net.netfilter.nf_conntrack_udp_timeout_stream=20
 EOF
 sysctl -p /etc/sysctl.d/99-antiddos-mc.conf 2>/dev/null >/dev/null || true
+fi
 
 # 2. CÀI ĐẶT ỨNG DỤNG MỘT CÁCH TỰ ĐỘNG
+if [ "$FAST_MODE" = false ]; then
 echo "[2/6] Đang cài đặt Ipset & Iptables-persistent ngầm..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y -q >/dev/null 2>&1
 apt-get install -y -q ipset iptables iptables-persistent netfilter-persistent curl awk >/dev/null 2>&1
+fi
 
 # 3. TẢI VÀ NẠP DANH SÁCH VN VÀ NHẬT BẢN THẦN TỐC
+if [ "$FAST_MODE" = false ]; then
 echo "[3/6] Tải danh sách IP từ IPDeny (Chỉ: VN, JP)..."
 ZONE_DIR="/etc/antiddos_zones"
 mkdir -p "$ZONE_DIR"
@@ -59,12 +71,15 @@ echo "create allow_countries hash:net -exist" > "$ZONE_DIR/ipset_load.txt"
 awk '{print "add allow_countries " $1}' vn.zone >> "$ZONE_DIR/ipset_load.txt"
 awk '{print "add allow_countries " $1}' jp.zone >> "$ZONE_DIR/ipset_load.txt"
 ipset restore < "$ZONE_DIR/ipset_load.txt"
+fi
 
 # 4. KÍCH HOẠT QUẢ BOMB RỦI RO (HỦY THÀNH QUẢ TỰ ĐỘNG SAU 5 PHÚT NẾU LỖI)
+if [ "$FAST_MODE" = false ]; then
 echo "[4/6] Thiếp lập chế độ 5 phút tự cứu (Tránh bị khóa nhầm...)"
 ( sleep 300 && iptables -F && iptables -t nat -F && iptables -t mangle -F && echo -e "\n\n[!!!] SERVER ĐÃ TỰ ĐỘNG XÓA FIREWALL VÌ BẠN KHÔNG TẮT FAIL-SAFE TRONG 5 PHÚT.\n" > /dev/pts/0 2>/dev/null ) &
 FAILSAFE_PID=$!
 echo "$FAILSAFE_PID" > /tmp/antiddos_failsafe.pid
+fi
 
 # 5. CẤU HÌNH IPTABLES HOST (INPUT) VÀ TỰ DÒ CỔNG TCP
 echo "[5/6] Tự động đọc và bảo vệ Cổng (Port) hiện tại..."
