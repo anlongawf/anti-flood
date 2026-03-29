@@ -85,40 +85,61 @@ iptables -A INPUT -p icmp -j DROP
 # Tự động quét Port TCP
 ACTIVE_PORTS=$(ss -tulnp | awk 'NR>1 && $1~/tcp/ {print $5}' | awk -F: '{print $NF}' | sort -n | uniq)
 for port in $ACTIVE_PORTS; do
-    echo "      -> Đã khóa & mở sẵn TCP Port: $port"
-    # Giới hạn cho port quản lý (Pterodactyl/SSH) = cứng 15 connection cho chắc cú
-    iptables -A INPUT -p tcp --dport "$port" -m connlimit --connlimit-above 15 -j REJECT --reject-with tcp-reset
+    echo "      -> Đã khóa & bảo vệ TCP Port: $port"
+    # Giới hạn cho port quản lý (Pterodactyl/SSH) = cứng 20 connection 
+    iptables -A INPUT -p tcp --dport "$port" -m connlimit --connlimit-above 20 -j REJECT --reject-with tcp-reset
     iptables -A INPUT -p tcp --dport "$port" -j ACCEPT
 done
 
 iptables -A INPUT -m set --match-set allow_countries src -j ACCEPT
 iptables -A INPUT -j DROP # Drop TẤT CẢ TCP/UDP không thuộc danh sách hoặc các Port không dùng làm dịch vụ
 
-# 6. BẢO VỆ DỰ ÁN MINECRAFT (DOCKER-USER) - CHẶN CƯỜNG ĐỘ CAO (RATE/CONNLIMIT) ĐỐI VỚI GAME
-echo "[6/6] Định hình màng chắn chống DDoS Minecraft (UDP)..."
+# 6. BẢO VỆ MINECRAFT TRONG DOCKER (DOCKER-USER)
+echo "[6/6] Định hình màng chắn chống DDoS Minecraft (UDP & TCP)..."
 
-# Xoá rác luật cũ nếu đã từng cài
-while iptables -D DOCKER-USER -s 172.16.0.0/12 -j RETURN 2>/dev/null; do :; done
-while iptables -D DOCKER-USER -m state --state ESTABLISHED,RELATED -j RETURN 2>/dev/null; do :; done
-while iptables -D DOCKER-USER -p udp -m set ! --match-set allow_countries src -j DROP 2>/dev/null; do :; done
-while iptables -D DOCKER-USER -p udp -m set --match-set allow_countries src -m connlimit --connlimit-above 10 -j DROP 2>/dev/null; do :; done
-while iptables -D DOCKER-USER -p udp -m set --match-set allow_countries src -m hashlimit --hashlimit-upto 30/sec --hashlimit-burst 50 --hashlimit-mode srcip --hashlimit-name udp_ratelimit -j RETURN 2>/dev/null; do :; done
-while iptables -D DOCKER-USER -p udp -m set --match-set allow_countries src -j DROP 2>/dev/null; do :; done
+# --- TỰ ĐỘNG DÒ CỔNG MINECRAFT (DOCKER) ---
+# Dò port map từ host vào container (thường là 25565)
+MC_TCP_PORTS=$(docker ps --format '{{.Ports}}' 2>/dev/null | grep -oP '\d+(?=->25565)' | sort -n | uniq)
+if [ -z "$MC_TCP_PORTS" ]; then
+    MC_TCP_PORTS=$(ss -tulnp | awk 'NR>1 && $1~/tcp/ {print $5}' | awk -F: '{print $NF}' | grep -E '^255[0-9]{2}$' | sort -n | uniq)
+fi
+[ -z "$MC_TCP_PORTS" ] && MC_TCP_PORTS="25565"
 
-# Insert đảo ngược (Từ quy tắc cuối lên đầu tiên)
-# 4. Khi quá tải băm (hashlimit rớt) thì Drop nó
-iptables -I DOCKER-USER 1 -p udp -m set --match-set allow_countries src -j DROP
-# 3. Chặn hành vi flood quá dữ dội (> 30 packet / giây đến từ IP VN/JP) thì pass rule này
-iptables -I DOCKER-USER 1 -p udp -m set --match-set allow_countries src -m hashlimit --hashlimit-upto 30/sec --hashlimit-burst 50 --hashlimit-mode srcip --hashlimit-name udp_ratelimit -j RETURN
-# 2. Xóa xổ Client có > 10 Session kết nối (Ngừa IP Booter VN)
-iptables -I DOCKER-USER 1 -p udp -m set --match-set allow_countries src -m connlimit --connlimit-above 10 -j DROP
-# 1. Chặn IP ngoại quốc vĩnh viễn (UDP)
-iptables -I DOCKER-USER 1 -p udp -m set ! --match-set allow_countries src -j DROP
+# --- DỌN DẸP RULE CŨ TRONG DOCKER-USER ---
+iptables -F DOCKER-USER 2>/dev/null
 
-# --- BẢO VỆ GIAO TIẾP NỘI BỘ MẠNG DOCKER PTERODACTYL (NẰM TRÊN CÙNG) ---
-# Cực kỳ quan trọng để Server có thể kết nối DNS UDP ra quốc tế tải file Mojang
-iptables -I DOCKER-USER 1 -s 172.16.0.0/12 -j RETURN
-iptables -I DOCKER-USER 1 -m state --state ESTABLISHED,RELATED -j RETURN
+# --- THIẾT LẬP LUẬT BẢO VỆ (Rule nào khớp sẽ thoát bằng RETURN) ---
+# 1. Luôn cho phép các kết nối đã thiết lập và mạng nội bộ Docker
+iptables -A DOCKER-USER -m state --state ESTABLISHED,RELATED -j RETURN
+iptables -A DOCKER-USER -s 172.16.0.0/12 -j RETURN
+
+# 2. CHỐNG SYN FLOOD & TCP STATE ANOMALY (Toàn bộ TCP)
+iptables -A DOCKER-USER -p tcp ! --syn -m state --state NEW -j DROP 
+iptables -A DOCKER-USER -p tcp --syn -m hashlimit --hashlimit-upto 50/sec --hashlimit-burst 100 --hashlimit-mode srcip --hashlimit-name tcp_syn_limit -j RETURN
+iptables -A DOCKER-USER -p tcp --syn -j DROP
+
+# 3. BẢO VỆ RIÊNG CHO CÁC PORT MINECRAFT TCP
+for port in $MC_TCP_PORTS; do
+    echo "      -> Cài giáp TCP Minecraft Port: $port"
+    # Chặn IP ngoại quốc
+    iptables -A DOCKER-USER -p tcp --dport "$port" -m set ! --match-set allow_countries src -j DROP
+    # Giới hạn 20 kết nối/IP (áp dụng cho cả IP VN/JP)
+    iptables -A DOCKER-USER -p tcp --dport "$port" -m connlimit --connlimit-above 20 -j REJECT --reject-with tcp-reset
+    # Nếu vượt qua các bước trên -> OK
+    iptables -A DOCKER-USER -p tcp --dport "$port" -j RETURN
+done
+
+# 4. BẢO VỆ MINECRAFT UDP (BEDROCK)
+echo "      -> Cài giáp UDP Minecraft..."
+# Chặn IP ngoại quốc (UDP)
+iptables -A DOCKER-USER -p udp -m set ! --match-set allow_countries src -j DROP
+# Giới hạn 10 luồng UDP/IP
+iptables -A DOCKER-USER -p udp -m set --match-set allow_countries src -m connlimit --connlimit-above 10 -j DROP
+# Rate limit 30 packet/giây
+iptables -A DOCKER-USER -p udp -m set --match-set allow_countries src -m hashlimit --hashlimit-upto 30/sec --hashlimit-burst 50 --hashlimit-mode srcip --hashlimit-name udp_ratelimit -j RETURN
+# Khi quá tải -> Drop
+iptables -A DOCKER-USER -p udp -m set --match-set allow_countries src -j DROP
+
 
 # Luôn cho phép Output 
 iptables -I OUTPUT 1 -j ACCEPT
