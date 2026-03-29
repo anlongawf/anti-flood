@@ -8,8 +8,9 @@
 
 echo -e "\033[1;36m[+] Đang cài đặt Kẻ Giác Ngộ (Systemd Guardian) cho Docker...\033[0m"
 
-# Trỏ chính xác đến file bash vừa nãy của ông
-SCRIPT_PATH="/Users/anphan/Documents/block_ip/antiddos.sh"
+# Tự động dò đường dẫn tuyệt đối của file antiddos.sh
+CURRENT_DIR=$(cd "$(dirname "$0")" && pwd)
+SCRIPT_PATH=$(cd "$CURRENT_DIR/../../" && pwd)/antiddos.sh
 
 cat << EOF > /etc/systemd/system/antiddos-guardian.service
 [Unit]

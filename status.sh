@@ -35,7 +35,7 @@ IP_COUNT=$(ipset list allow_countries 2>/dev/null | grep 'Number of entries:' | 
 [[ -n "$(crontab -l 2>/dev/null | grep 'antiddos_monitor.sh')" ]] && MON_STATUS="${GREEN}ĐANG ĐẨY BÁO CÁO${NC}" || MON_STATUS="${YELLOW}KHÔNG HOẠT ĐỘNG${NC}"
 
 # 7. Dò tìm Minecraft & Kết nối
-MC_PORTS=$(ss -tulnp | awk 'NR>1 && $1~/tcp/ {print $5}' | awk -F: '{print $NF}' | grep -E '^255[0-9]{2}$|^19132$' | sort -V | uniq)
+MC_PORTS=$(ss -tulnp | awk 'NR>1 && $1~/tcp/ {print $5}' | awk -F: '{print $NF}' | grep -E '^255[0-9]{2}$|^2557[1-9]$|^1913[0-9]$|^1914[0-9]$|^19199$|^19999$|^34725$|^2029$' | sort -V | uniq)
 CONN_COUNTS=$(ss -tun state established | wc -l)
 
 clear

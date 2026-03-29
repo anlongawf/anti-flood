@@ -64,6 +64,7 @@ ipset restore < "$ZONE_DIR/ipset_load.txt"
 echo "[4/6] Thiếp lập chế độ 5 phút tự cứu (Tránh bị khóa nhầm...)"
 ( sleep 300 && iptables -F && iptables -t nat -F && iptables -t mangle -F && echo -e "\n\n[!!!] SERVER ĐÃ TỰ ĐỘNG XÓA FIREWALL VÌ BẠN KHÔNG TẮT FAIL-SAFE TRONG 5 PHÚT.\n" > /dev/pts/0 2>/dev/null ) &
 FAILSAFE_PID=$!
+echo "$FAILSAFE_PID" > /tmp/antiddos_failsafe.pid
 
 # 5. CẤU HÌNH IPTABLES HOST (INPUT) VÀ TỰ DÒ CỔNG TCP
 echo "[5/6] Tự động đọc và bảo vệ Cổng (Port) hiện tại..."
@@ -97,12 +98,12 @@ iptables -A INPUT -j DROP # Drop TẤT CẢ TCP/UDP không thuộc danh sách ho
 # 6. BẢO VỆ MINECRAFT TRONG DOCKER (DOCKER-USER)
 echo "[6/6] Định hình màng chắn chống DDoS Minecraft (UDP & TCP)..."
 
-# --- TỰ ĐỘNG DÒ CỔNG MINECRAFT (DOCKER) ---
-# Dò port map từ host vào container (thường là 25565)
-MC_TCP_PORTS=$(docker ps --format '{{.Ports}}' 2>/dev/null | grep -oP '\d+(?=->25565)' | sort -n | uniq)
-if [ -z "$MC_TCP_PORTS" ]; then
-    MC_TCP_PORTS=$(ss -tulnp | awk 'NR>1 && $1~/tcp/ {print $5}' | awk -F: '{print $NF}' | grep -E '^255[0-9]{2}$' | sort -n | uniq)
-fi
+# --- TỰ ĐỘNG DÒ CÔNG MINECRAFT (DOCKER & SYSTEM) ---
+# Dò port map từ host vào container (ưu tiên 25565)
+MC_TCP_PORTS_DOCKER=$(docker ps --format '{{.Ports}}' 2>/dev/null | grep -oP '\d+(?=->25565)' | sort -n | uniq)
+# Dò thêm từ hệ thống (các dải port phổ biến 1913x, 1914x, 255xx, v.v.)
+MC_TCP_PORTS_SYSTEM=$(ss -tulnp | awk 'NR>1 && $1~/tcp/ {print $5}' | awk -F: '{print $NF}' | grep -E '^255[0-9]{2}$|^2557[1-9]$|^1913[0-9]$|^1914[0-9]$|^19199$|^19999$|^34725$|^2029$' | sort -n | uniq)
+MC_TCP_PORTS=$(echo -e "$MC_TCP_PORTS_DOCKER\n$MC_TCP_PORTS_SYSTEM" | grep -v '^$' | sort -n | uniq | xargs)
 [ -z "$MC_TCP_PORTS" ] && MC_TCP_PORTS="25565"
 
 # --- DỌN DẸP RULE CŨ TRONG DOCKER-USER ---

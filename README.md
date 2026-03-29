@@ -12,33 +12,27 @@ Một giải pháp chặn DDoS toàn diện (iptables + ipset + GeoIP + Kernel T
 - **Ép Xung Nhân Linux:** Cấu trúc tự cập nhật nhân Linux mở rộng bộ đệm `nf_conntrack` lến 2 Triệu connection và thiết lập giáp TCP SYN Cookies.
 - **Docker Guardian:** Tích hợp cảnh vệ `systemd` tự động nạp lại Firewall mỗi khi Docker Restart, chống việc Pterodactyl đập bể rules.
 - **Live Discord Dashboard:** Cỗ máy định kỳ quét trạng thái RAM/CPU/Connections và Báo cáo trực tiếp lên Discord mỗi phút một lần.
+- **Global Status Check:** Lệnh `status.sh` tích hợp sẵn để kiểm tra nhanh mọi thông số hệ thống và sức khỏe Firewall chỉ trong 1 giây.
 
 ---
 
-## 🚀 Hướng Dẫn Cài Đặt Thần Tốc (Quick Start)
+## 🚀 Cài Đặt Tất Cả Trong Một (All-in-One)
 
-Dán toàn bộ khối lệnh dưới đây vào Terminal của VPS (Ubuntu/Debian) để cài đặt từ đầu:
+Dán lệnh duy nhất này để cài đặt Firewall + Guardian + Monitor (tùy chọn) cùng lúc:
 
 ```bash
-# 1. Kéo mã nguồn về hệ thống
 git clone https://github.com/anlongawf/anti-flood.git
 cd anti-flood
-
-# 2. Cấp quyền và kích hoạt giáp Anti-DDoS
-chmod +x antiddos.sh && sudo ./antiddos.sh
-
-# 3. (Tùy chọn) Cài đặt "Cảnh Vệ" để tự động bảo vệ Docker/Pterodactyl
-chmod +x Advanced_AntiDDoS/Backend_Node/install_guardian.sh
-sudo ./Advanced_AntiDDoS/Backend_Node/install_guardian.sh
+chmod +x install.sh && sudo ./install.sh
 ```
 
 ---
 
-## 🛠️ Cấu Hình Chi Tiết
-
-Hệ thống hoạt động tốt nhất dưới quyền **Root**.
-
-### 1. Kích Hoạt Lõi Tường Lửa (`antiddos.sh`)
+## 📊 Kiểm Tra Trạng Thái
+Sau khi cài đặt, dùng lệnh dưới đây để xem Dashboard chiến sự:
+```bash
+sudo ./status.sh
+```
 Lõi này sẽ tự động:
 - Tinh chỉnh Kernel Nhân Linux.
 - Tải danh sách IP VN/JP vào RAM (ipset).
