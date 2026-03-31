@@ -32,6 +32,11 @@ GBPS=$(echo "scale=2; $BPS * 8 / 1000000000" | bc 2>/dev/null || echo "0")
 # 2. CHẨN ĐOÁN LOẠI TẤN CÔNG (Dựa trên Nftables counter)
 ATTACK_TYPE="⚔️ Botnet / Application Attack"
 DROPPED=$(nft list table netdev antiddos_v2 2>/dev/null | grep "drop" | awk '{sum+=$NF} END {print sum}')
+# Đảm bảo các biến luôn là số nguyên để tránh lỗi so sánh
+MBPS=${MBPS:-0}
+DROPPED=${DROPPED:-0}
+[[ ! "$MBPS" =~ ^[0-9]+$ ]] && MBPS=0
+[[ ! "$DROPPED" =~ ^[0-9]+$ ]] && DROPPED=0
 
 # Phân tích sâu hơn các gói tin bị chặn
 if nft list table netdev antiddos_v2 2>/dev/null | grep -A 5 "ingress" | grep -q "tcp flags & (fin|syn) == (fin|syn)"; then

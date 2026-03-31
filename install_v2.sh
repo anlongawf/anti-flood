@@ -22,14 +22,21 @@ chmod +x scripts/*.sh status.sh Advanced_AntiDDoS/Backend_Node/guardian.sh 2>/de
 
 # 2. Thiết lập Webhook Discord
 echo -e "\n\033[1;36m[1/5] Cấu hình Webhook Discord...\033[0m"
-# Tự động hỏi Webhook nếu chưa có
+# Hỏi Webhook nếu chưa có hoặc muốn cập nhật
 if [ ! -f /usr/local/bin/antiddos_monitor.sh ]; then
-    read -r -p "[?] Nhập Link Webhook Discord của bạn (Enter để bỏ qua): " WEBHOOK_URL
-    if [[ "$WEBHOOK_URL" =~ ^https://discord.com/api/webhooks/ ]]; then
-        echo "#!/bin/bash" > /usr/local/bin/antiddos_monitor.sh
-        echo "WEBHOOK=\"$WEBHOOK_URL\"" >> /usr/local/bin/antiddos_monitor.sh
-        chmod +x /usr/local/bin/antiddos_monitor.sh
+    read -r -p "[?] Nhập Link Webhook Discord của bạn: " WEBHOOK_URL
+else
+    echo "      -> Đã tìm thấy cấu hình Webhook cũ."
+    read -r -p "[?] Bạn có muốn cập nhật Webhook mới không? (y/N): " update_choice
+    if [[ "$update_choice" =~ ^[Yy]$ ]]; then
+        read -r -p "[>] Nhập Link Webhook Discord MỚI: " WEBHOOK_URL
     fi
+fi
+
+if [[ "$WEBHOOK_URL" =~ ^https://discord.com/api/webhooks/ ]]; then
+    echo "#!/bin/bash" > /usr/local/bin/antiddos_monitor.sh
+    echo "WEBHOOK=\"$WEBHOOK_URL\"" >> /usr/local/bin/antiddos_monitor.sh
+    chmod +x /usr/local/bin/antiddos_monitor.sh
 fi
 
 # 2.1. TEST WEBHOOK NGAY LẬP TỨC
