@@ -6,19 +6,38 @@
 
 echo -e "\033[1;35m[+] ĐANG CHUẨN BỊ CHIẾN ĐỘI PHÒNG THỦ V2...\033[0m"
 
+# --- GIAI ĐOẠN 0: DỌN DẸP HỆ THỐNG CŨ (CLEAN UP V1) ---
+echo -e "\033[1;36m[0/4] Đang dọn dẹp hệ thống phòng thủ cũ (V1)...\033[0m"
+# 1. Flush Iptables cũ để không xung đột với Nftables V2
+sudo iptables -F INPUT 2>/dev/null
+sudo iptables -F DOCKER-USER 2>/dev/null
+# 2. Xóa các cronjob cũ
+crontab -l 2>/dev/null | grep -v "antiddos_monitor.sh" | crontab -
+# 3. Lưu trữ các file cũ vào thư mục Backup
+mkdir -p legacy_v1
+mv antiddos.sh install.sh setup_monitor.sh legacy_v1/ 2>/dev/null
+
 # 1. Phân quyền
-chmod +x scripts/*.sh status.sh setup_monitor.sh Advanced_AntiDDoS/Backend_Node/guardian.sh 2>/dev/null
+chmod +x scripts/*.sh status.sh Advanced_AntiDDoS/Backend_Node/guardian.sh 2>/dev/null
 
 # 2. Thiết lập Webhook Discord
-echo -e "\n\033[1;36m[1/3] Cấu hình Webhook Discord...\033[0m"
-bash setup_monitor.sh
+echo -e "\n\033[1;36m[1/4] Cấu hình Webhook Discord...\033[0m"
+# Tự động hỏi Webhook nếu chưa có
+if [ ! -f /usr/local/bin/antiddos_monitor.sh ]; then
+    read -r -p "[?] Nhập Link Webhook Discord của bạn (Enter để bỏ qua): " WEBHOOK_URL
+    if [[ "$WEBHOOK_URL" =~ ^https://discord.com/api/webhooks/ ]]; then
+        echo "#!/bin/bash" > /usr/local/bin/antiddos_monitor.sh
+        echo "WEBHOOK=\"$WEBHOOK_URL\"" >> /usr/local/bin/antiddos_monitor.sh
+        chmod +x /usr/local/bin/antiddos_monitor.sh
+    fi
+fi
 
 # 3. Chạy Setup chính (Nftables + Kernel + Geo)
-echo -e "\n\033[1;36m[2/3] Triển khai Giáp V2 chuyên sâu...\033[0m"
+echo -e "\n\033[1;36m[2/4] Triển khai Giáp V2 chuyên sâu...\033[0m"
 sudo bash scripts/setup.sh
 
 # 4. Kích hoạt Guardian (Chạy ngầm)
-echo -e "\n\033[1;36m[3/3] Triển khai Cảnh vệ Guardian (Self-Healing)...\033[0m"
+echo -e "\n\033[1;36m[3/4] Triển khai Cảnh vệ Guardian (Self-Healing)...\033[0m"
 # Tìm và tắt Guardian cũ nếu có
 pkill -f guardian.sh
 nohup bash Advanced_AntiDDoS/Backend_Node/guardian.sh > /dev/null 2>&1 &
