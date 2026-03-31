@@ -14,20 +14,29 @@ echo "[+] Cảnh vệ đang bắt đầu tuần tra (Chu kỳ 10 giây)..."
 
 while true; do
     # 2. Thu thập danh sách Port hiện tại (TCP & UDP)
-    # Lấy port từ Docker và các port đang listen trên hệ thống
     CURRENT_PORTS=$( (docker ps --format '{{.Ports}}' 2>/dev/null; ss -tulnp | awk 'NR>1 {print $5}' | awk -F: '{print $NF}') | sort | uniq | xargs )
 
-    # 3. So sánh với lần quét trước
-    if [ ! -f "$LAST_PORTS_FILE" ] || [ "$CURRENT_PORTS" != "$(cat "$LAST_PORTS_FILE")" ]; then
-        echo "[!] PHÁT HIỆN THAY ĐỔI PORT: Cập nhật Firewall ngay lập tức..."
-        echo "$CURRENT_PORTS" > "$LAST_PORTS_FILE"
-        
-        # Gọi script Anti-DDoS ở chế độ FAST
-        bash "$ANTIDDOS_SCRIPT" --fast
-        
-        echo "[✔] Đã cập nhật xong. Tiếp tục tuần tra..."
+    # --- TỰ PHỤC HỒI (SELF-HEALING) ---
+    # Kiểm tra xem bảng Nftables V2 có bị mất không
+    if ! nft list table netdev antiddos_v2 >/dev/null 2>&1; then
+        echo "[!] CẢNH BÁO: Bảng Firewall V2 bị mất! Đang phục hồi ngay lập tức..."
+        bash /Users/anphan/Documents/block_ip/scripts/setup.sh
     fi
 
-    # 4. Nghỉ ngơi 10 giây
+    # 3. So sánh Port với lần quét trước
+    if [ ! -f "$LAST_PORTS_FILE" ] || [ "$CURRENT_PORTS" != "$(cat "$LAST_PORTS_FILE")" ]; then
+        echo "[!] PHÁT HIỆN THAY ĐỔI PORT: Cài đặt Giáp V2 ngay lập tức..."
+        echo "$CURRENT_PORTS" > "$LAST_PORTS_FILE"
+        
+        # Gọi script setup V2 (Chỉ cấu hình Nftables, không cài lại Dependencies)
+        bash /Users/anphan/Documents/block_ip/scripts/setup.sh
+        
+        echo "[✔] Đã khóa port mới. Tiếp tục tuần tra..."
+    fi
+
+    # 4. Gửi cảnh báo Discord nếu có DDoS
+    bash /Users/anphan/Documents/block_ip/scripts/alerts.sh
+
+    # 5. Nghỉ ngơi 10 giây
     sleep 10
 done
