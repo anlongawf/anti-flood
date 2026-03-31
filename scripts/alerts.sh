@@ -52,26 +52,37 @@ if nft list table netdev antiddos_v2 2>/dev/null | grep -A 5 "ingress" | grep -q
     ATTACK_TYPE="🧩 Fragmented IP Attack"
 fi
 
-# 3. GỬI CẢNH BÁO NẾU PHÁT HIỆN BẤT THƯỜNG (PPS > 5,000 hoặc MBPS > 50)
-if [ "$MBPS" -gt 50 ] || [ "$DROPPED" -gt 5000 ]; then
-    TIMESTAMP=$(date '+%d/%m/%Y %H:%M:%S')
-    
-    PAYLOAD=$(cat <<JSON
+# 3. CHẾ ĐỘ GỬI TIN NHẮN (Gửi định kỳ hoặc Khi bị tấn công)
+TIMESTAMP=$(date '+%d/%m/%Y %H:%M:%S')
+IS_ATTACK=false
+[ "$MBPS" -gt 50 ] || [ "$DROPPED" -gt 5000 ] && IS_ATTACK=true
+
+# Màu sắc: Đỏ nếu bị ddos, Xanh nếu ổn định
+COLOR=5814783
+TITLE="📡 [BÁO CÁO ĐỊNH KỲ] PTERODACTYL NODE"
+if [ "$IS_ATTACK" = true ]; then
+    COLOR=15548997
+    TITLE="🔥 [CẢNH BÁO ĐANG BỊ DDOS] V2 SIÊU CƯỜNG"
+fi
+
+PAYLOAD=$(cat <<JSON
 {
   "embeds": [{
-    "title": "🔥 [CẢNH BÁO ĐANG BỊ DDOS] V2 SIÊU CƯỜNG",
-    "color": 15548997,
+    "title": "$TITLE",
+    "color": $COLOR,
     "fields": [
-      { "name": "📡 Loại tấn công", "value": "\`${ATTACK_TYPE}\`", "inline": true },
-      { "name": "🚀 Băng thông dội vào", "value": "\`${GBPS} Gbps (${MBPS} Mbps)\`", "inline": true },
-      { "name": "🧱 Gói tin bị ép chết", "value": "\`${DROPPED} Packets\`", "inline": false },
-      { "name": "💻 Interface", "value": "\`${INTERFACE}\`", "inline": true },
-      { "name": "⏱️ Thời điểm", "value": "\`${TIMESTAMP}\`", "inline": true }
+      { "name": "⏱️ Lõi Mạng (Ping)", "value": "\`$(ping -c 1 8.8.8.8 | awk -F '/' 'END {printf "%.0f\n", $5}')ms\`", "inline": true },
+      { "name": "🚀 Băng thông (Gbps)", "value": "\`${GBPS} Gbps (${MBPS} Mbps)\`", "inline": true },
+      { "name": "📡 Loại lưu lượng", "value": "\`${ATTACK_TYPE}\`", "inline": false },
+      { "name": "🧱 Gói tin bị ép chết", "value": "🔥 \`${DROPPED}\` Gói tin rác", "inline": true },
+      { "name": "💻 Tài Nguyên", "value": "CPU: \`$(top -bn1 | grep 'Cpu(s)' | awk '{print 100 - $8}')%\` | RAM Trống: \`$(free -m | awk '/Mem:/ {print $4}')MB\`", "inline": true },
+      { "name": "🔍 TOP 3 IP KẾT NỐI", "value": "\`$(ss -tun state established | awk 'NR>1 {print $5}' | sed -E 's/.*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*/\1/' | grep -v '127.0.0.1' | sort | uniq -c | sort -nr | head -n 3 | awk '{print $2 " (" $1 ")"}' | tr '\n' ' | ')\`", "inline": false }
     ],
-    "footer": { "text": "Hệ thống Cảnh vệ Cao cấp Agent" }
+    "footer": { "text": "Hệ thống Anti-DDoS V2 Agent • $TIMESTAMP" }
   }]
 }
 JSON
 )
-    curl -s -H "Content-Type: application/json" -X POST -d "$PAYLOAD" "$WEBHOOK" >/dev/null 2>&1
-fi
+
+# Gửi tin nhắn (Nếu là Alert thì gửi ngay, nếu là Report thì Cronjob lo)
+curl -s -H "Content-Type: application/json" -X POST -d "$PAYLOAD" "$WEBHOOK" >/dev/null 2>&1
