@@ -30,7 +30,6 @@ MBPS=$((BPS * 8 / 1000000))
 GBPS=$(echo "scale=2; $BPS * 8 / 1000000000" | bc 2>/dev/null || echo "0")
 
 # 2. CHẨN ĐOÁN LOẠI TẤN CÔNG (Dựa trên Nftables counter)
-ATTACK_TYPE="⚔️ Botnet / Application Attack"
 DROPPED=$(nft list table netdev antiddos_v2 2>/dev/null | grep "drop" | awk '{sum+=$NF} END {print sum}')
 # Đảm bảo các biến luôn là số nguyên để tránh lỗi so sánh
 MBPS=${MBPS:-0}
@@ -38,18 +37,23 @@ DROPPED=${DROPPED:-0}
 [[ ! "$MBPS" =~ ^[0-9]+$ ]] && MBPS=0
 [[ ! "$DROPPED" =~ ^[0-9]+$ ]] && DROPPED=0
 
-# Phân tích sâu hơn các gói tin bị chặn
-if nft list table netdev antiddos_v2 2>/dev/null | grep -A 5 "ingress" | grep -q "tcp flags & (fin|syn) == (fin|syn)"; then
-    ATTACK_TYPE="🧨 TCP SYN/Malformed Flood"
-fi
-if nft list table netdev antiddos_v2 2>/dev/null | grep -A 10 "ingress" | grep -q "udp dport"; then
-    ATTACK_TYPE="🌊 UDP Volumetric Flood"
-fi
-if nft list table netdev antiddos_v2 2>/dev/null | grep -A 10 "ingress" | grep -q "0x00ffff00fefefefefdfdfdfd12345678"; then
-    ATTACK_TYPE="🤖 Minecraft RakNet Join-Bot"
-fi
-if nft list table netdev antiddos_v2 2>/dev/null | grep -A 5 "ingress" | grep -q "ip frag-off"; then
-    ATTACK_TYPE="🧩 Fragmented IP Attack"
+# Mặc định là ổn định
+ATTACK_TYPE="✅ Hệ thống Ổn định / Bình thường"
+
+# Phân tích sâu hơn các quy tắc có số lượng gói tin bị chặn (counter > 0)
+if [ "$DROPPED" -gt 0 ]; then
+    ATTACK_TYPE="⚔️ Botnet / Application Attack"
+    
+    # Kiểm tra từng rule cụ thể
+    if nft list table netdev antiddos_v2 2>/dev/null | grep "tcp flags & (fin|syn) == (fin|syn)" | grep -v "packets 0" >/dev/null; then
+        ATTACK_TYPE="🧨 TCP SYN/Malformed Flood"
+    elif nft list table netdev antiddos_v2 2>/dev/null | grep "0x00ffff00fefefefefdfdfdfd12345678" | grep -v "packets 0" >/dev/null; then
+        ATTACK_TYPE="🤖 Minecraft RakNet Join-Bot"
+    elif nft list table netdev antiddos_v2 2>/dev/null | grep "ip frag-off" | grep -v "packets 0" >/dev/null; then
+        ATTACK_TYPE="🧩 Fragmented IP Attack"
+    elif nft list table netdev antiddos_v2 2>/dev/null | grep "udp dport" | grep -v "packets 0" >/dev/null; then
+        ATTACK_TYPE="🌊 UDP Volumetric Flood"
+    fi
 fi
 
 # 3. CHẾ ĐỘ GỬI TIN NHẮN (Gửi định kỳ hoặc Khi bị tấn công)
