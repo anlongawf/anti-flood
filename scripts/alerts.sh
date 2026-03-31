@@ -4,15 +4,21 @@
 # Chẩn đoán loại tấn công & Tính toán băng thông thực tế
 # ==========================================================
 
+# TỰ ĐỘNG XÁC ĐỊNH ĐƯỜNG DẪN SCRIPT
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INTERFACE=$(ip -o -4 route get 8.8.8.8 | sed -nr 's/.*dev ([^ ]+).*/\1/p')
 [ -z "$INTERFACE" ] && INTERFACE="eth0"
 
-# Lấy Webhook từ cấu hình cũ nếu có
+# Lấy Webhook từ môi trường hoặc cấu hình hệ thống
 WEBHOOK=$(grep -oP 'https://discord.com/api/webhooks/[^"]+' /usr/local/bin/antiddos_monitor.sh 2>/dev/null | head -n 1)
 
 if [ -z "$WEBHOOK" ]; then
-    echo "[!] Không tìm thấy Webhook URL. Vui lòng chạy setup_monitor.sh trước."
-    exit 1
+    # Thử tìm Webhook trong thư mục cài đặt nếu /usr/local/bin không có
+    WEBHOOK=$(grep -oP 'https://discord.com/api/webhooks/[^"]+' "$SCRIPT_DIR/../setup_monitor.sh" 2>/dev/null | head -n 1)
+fi
+
+if [ -z "$WEBHOOK" ]; then
+    exit 1 # Im lặng thoát nếu không có webhook
 fi
 
 # 1. TÍNH TOÁN BĂNG THÔNG (Gbps/Mbps)
@@ -24,19 +30,25 @@ MBPS=$((BPS * 8 / 1000000))
 GBPS=$(echo "scale=2; $BPS * 8 / 1000000000" | bc 2>/dev/null || echo "0")
 
 # 2. CHẨN ĐOÁN LOẠI TẤN CÔNG (Dựa trên Nftables counter)
-ATTACK_TYPE="Unknown / Botnet"
-DROPPED=$(nft list table netdev antiddos_v2 | grep "drop" | awk '{sum+=$NF} END {print sum}')
+ATTACK_TYPE="⚔️ Botnet / Application Attack"
+DROPPED=$(nft list table netdev antiddos_v2 2>/dev/null | grep "drop" | awk '{sum+=$NF} END {print sum}')
 
-# Kiểm tra các rule cụ thể để đoán loại
-if nft list table netdev antiddos_v2 | grep -q "tcp flags & (fin|syn) == (fin|syn)"; then
-    ATTACK_TYPE="TCP SYN Flood / Malformed"
+# Phân tích sâu hơn các gói tin bị chặn
+if nft list table netdev antiddos_v2 2>/dev/null | grep -A 5 "ingress" | grep -q "tcp flags & (fin|syn) == (fin|syn)"; then
+    ATTACK_TYPE="🧨 TCP SYN/Malformed Flood"
 fi
-if nft list table netdev antiddos_v2 | grep -q "udp dport"; then
-    ATTACK_TYPE="UDP Flood / RakNet Attack"
+if nft list table netdev antiddos_v2 2>/dev/null | grep -A 10 "ingress" | grep -q "udp dport"; then
+    ATTACK_TYPE="🌊 UDP Volumetric Flood"
+fi
+if nft list table netdev antiddos_v2 2>/dev/null | grep -A 10 "ingress" | grep -q "0x00ffff00fefefefefdfdfdfd12345678"; then
+    ATTACK_TYPE="🤖 Minecraft RakNet Join-Bot"
+fi
+if nft list table netdev antiddos_v2 2>/dev/null | grep -A 5 "ingress" | grep -q "ip frag-off"; then
+    ATTACK_TYPE="🧩 Fragmented IP Attack"
 fi
 
-# 3. GỬI CẢNH BÁO NẾU PHÁT HIỆN BẤT THƯỜNG (PPS cao hoặc MBPS > 100)
-if [ "$MBPS" -gt 100 ] || [ "$DROPPED" -gt 10000 ]; then
+# 3. GỬI CẢNH BÁO NẾU PHÁT HIỆN BẤT THƯỜNG (PPS > 5,000 hoặc MBPS > 50)
+if [ "$MBPS" -gt 50 ] || [ "$DROPPED" -gt 5000 ]; then
     TIMESTAMP=$(date '+%d/%m/%Y %H:%M:%S')
     
     PAYLOAD=$(cat <<JSON

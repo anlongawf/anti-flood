@@ -21,7 +21,7 @@ mv antiddos.sh install.sh setup_monitor.sh legacy_v1/ 2>/dev/null
 chmod +x scripts/*.sh status.sh Advanced_AntiDDoS/Backend_Node/guardian.sh 2>/dev/null
 
 # 2. Thiết lập Webhook Discord
-echo -e "\n\033[1;36m[1/4] Cấu hình Webhook Discord...\033[0m"
+echo -e "\n\033[1;36m[1/5] Cấu hình Webhook Discord...\033[0m"
 # Tự động hỏi Webhook nếu chưa có
 if [ ! -f /usr/local/bin/antiddos_monitor.sh ]; then
     read -r -p "[?] Nhập Link Webhook Discord của bạn (Enter để bỏ qua): " WEBHOOK_URL
@@ -32,15 +32,28 @@ if [ ! -f /usr/local/bin/antiddos_monitor.sh ]; then
     fi
 fi
 
+# 2.1. TEST WEBHOOK NGAY LẬP TỨC
+if [ -f /usr/local/bin/antiddos_monitor.sh ]; then
+    echo -e "      -> Đang gửi tin nhắn TEST tới Discord..."
+    bash scripts/alerts.sh # Chạy thử script alert để test kết nối
+fi
+
 # 3. Chạy Setup chính (Nftables + Kernel + Geo)
-echo -e "\n\033[1;36m[2/4] Triển khai Giáp V2 chuyên sâu...\033[0m"
+echo -e "\n\033[1;36m[2/5] Triển khai Giáp V2 chuyên sâu...\033[0m"
 sudo bash scripts/setup.sh
 
 # 4. Kích hoạt Guardian (Chạy ngầm)
-echo -e "\n\033[1;36m[3/4] Triển khai Cảnh vệ Guardian (Self-Healing)...\033[0m"
+echo -e "\n\033[1;36m[3/5] Triển khai Cảnh vệ Guardian (Self-Healing)...\033[0m"
 # Tìm và tắt Guardian cũ nếu có
 pkill -f guardian.sh
 nohup bash Advanced_AntiDDoS/Backend_Node/guardian.sh > /dev/null 2>&1 &
+
+# 5. Cài đặt Dashbroad Monitor
+echo -e "\n\033[1;36m[4/5] Thiết lập Lịch Báo cáo tự động (Crontab)...\033[0m"
+(crontab -l 2>/dev/null | grep -v "alerts.sh" | crontab -)
+(crontab -l 2>/dev/null; echo "*/5 * * * * bash /Users/anphan/Documents/block_ip/scripts/alerts.sh") | crontab -
+
+echo -e "\n\033[1;36m[5/5] Hoàn tất cài đặt!\033[0m"
 
 echo -e "\n\033[1;32m[✔] TẤT CẢ ĐÃ SẴN SÀNG! HỆ THỐNG ĐANG BẢO VỆ BẠN.\033[0m"
 echo -e "Hãy dùng \033[1;33mbash status.sh --watch\033[0m để xem chiến sự ddos (PPS/Gbps)."
