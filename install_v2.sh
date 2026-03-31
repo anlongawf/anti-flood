@@ -57,10 +57,12 @@ nohup bash Advanced_AntiDDoS/Backend_Node/guardian.sh > /dev/null 2>&1 &
 
 # 5. Cài đặt Unified Monitor & Alerts
 echo -e "\n\033[1;36m[4/5] Thiết lập Lịch Báo cáo V2 & Cảnh báo (Crontab)...\033[0m"
+# Lấy đường dẫn hiện tại của thư mục
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Xóa sạch các lịch cũ (V1 và V2 cũ) để không bị trùng lặp
 (crontab -l 2>/dev/null | grep -v "antiddos_monitor.sh" | grep -v "alerts.sh" | crontab -)
-# Thiết lập lịch mới: Báo cáo tình hình mỗi 5 phút một lần
-(crontab -l 2>/dev/null; echo "*/5 * * * * bash /Users/anphan/Documents/block_ip/scripts/alerts.sh") | crontab -
+# Thiết lập lịch mới: Báo cáo tình hình mỗi 1 phút một lần
+(crontab -l 2>/dev/null; echo "* * * * * bash $BASE_DIR/scripts/alerts.sh") | crontab -
 
 echo -e "\n\033[1;36m[5/5] Hoàn tất cài đặt!\033[0m"
 
