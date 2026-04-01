@@ -1,92 +1,115 @@
 #!/bin/bash
 # ==========================================================
-# 🔔 LAYER 5: DISCORD WEBHOOK ALERTS (V2)
-# Chẩn đoán loại tấn công & Tính toán băng thông thực tế
+# 💎 LAYER 5: DISCORD PREMIUM DASHBOARD (V2.1)
+# Nâng cấp trải nghiệm giám sát từ xa qua Discord
 # ==========================================================
 
 # TỰ ĐỘNG XÁC ĐỊNH ĐƯỜNG DẪN SCRIPT
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INTERFACE=$(ip -o -4 route get 8.8.8.8 | sed -nr 's/.*dev ([^ ]+).*/\1/p')
-[ -z "$INTERFACE" ] && INTERFACE="eth0"
+[ -z "$INTERFACE" ] && INTERFACE=$(ip link show | awk -F': ' '$2 != "lo" {print $2; exit}')
 
-# Lấy Webhook từ môi trường hoặc cấu hình hệ thống
+# Lấy Webhook từ cấu hình hệ thống
 WEBHOOK=$(grep -oP 'https://discord.com/api/webhooks/[^"]+' /usr/local/bin/antiddos_monitor.sh 2>/dev/null | head -n 1)
+[ -z "$WEBHOOK" ] && exit 1
 
-if [ -z "$WEBHOOK" ]; then
-    # Thử tìm Webhook trong thư mục cài đặt nếu /usr/local/bin không có
-    WEBHOOK=$(grep -oP 'https://discord.com/api/webhooks/[^"]+' "$SCRIPT_DIR/../setup_monitor.sh" 2>/dev/null | head -n 1)
+# File lưu trữ trạng thái cũ
+STATE_FILE="/tmp/antiddos_state.txt"
+DAILY_STATS="/tmp/antiddos_daily.txt"
+
+# 1. THU THẬP DỮ LIỆU
+RX_BYTES=$(grep "$INTERFACE" /proc/net/dev | awk '{print $2}')
+TOTAL_DROPS=$(nft list table netdev antiddos_v2 2>/dev/null | grep "packets" | awk '{sum+=$5} END {print sum}')
+[ -z "$TOTAL_DROPS" ] && TOTAL_DROPS=0
+
+# Xử lý Delta & Thời gian
+NOW=$(date +%s)
+TODAY=$(date '+%d%m%Y')
+
+if [ -f "$STATE_FILE" ]; then
+    read LAST_RX_BYTES LAST_TOTAL_DROPS LAST_TIMESTAMP LAST_DATE < "$STATE_FILE"
+else
+    LAST_RX_BYTES=$RX_BYTES; LAST_TOTAL_DROPS=$TOTAL_DROPS; LAST_TIMESTAMP=$NOW; LAST_DATE=$TODAY
 fi
 
-if [ -z "$WEBHOOK" ]; then
-    exit 1 # Im lặng thoát nếu không có webhook
+TIME_DIFF=$((NOW - LAST_TIMESTAMP))
+[ "$TIME_DIFF" -le 0 ] && TIME_DIFF=1
+
+# Tính toán Tốc độ
+BPS=$(( (RX_BYTES - LAST_RX_BYTES) / TIME_DIFF ))
+MBPS=$(echo "scale=2; $BPS * 8 / 1048576" | bc)
+DROPS_IN_PERIOD=$((TOTAL_DROPS - LAST_TOTAL_DROPS))
+[ "$DROPS_IN_PERIOD" -lt 0 ] && DROPS_IN_PERIOD=0
+
+# Cập nhật Thống kê ngày
+if [ "$TODAY" != "$LAST_DATE" ]; then
+    DAILY_COUNT=$DROPS_IN_PERIOD
+else
+    [ -f "$DAILY_STATS" ] && DAILY_COUNT=$(cat "$DAILY_STATS") || DAILY_COUNT=0
+    DAILY_COUNT=$((DAILY_COUNT + DROPS_IN_PERIOD))
+fi
+echo "$DAILY_COUNT" > "$DAILY_STATS"
+echo "$RX_BYTES $TOTAL_DROPS $NOW $TODAY" > "$STATE_FILE"
+
+# 2. PHÂN TÍCH TRẠNG THÁI & MÀU SẮC
+IS_ATTACK=false
+SEVERITY="Bình thường"
+COLOR=3066993 # Xanh lá (Normal)
+ICON="✅"
+
+if [ "$DROPS_IN_PERIOD" -gt 5000 ]; then
+    IS_ATTACK=true; SEVERITY="NGUY HIỂM"; COLOR=15158332; ICON="💀"
+elif [ "$DROPS_IN_PERIOD" -gt 500 ]; then
+    IS_ATTACK=true; SEVERITY="CẢNH BÁO"; COLOR=15105570; ICON="⚠️"
 fi
 
-# 1. TÍNH TOÁN BĂNG THÔNG (Gbps/Mbps)
-RX1=$(cat /proc/net/dev | grep "$INTERFACE" | awk '{print $2}')
-sleep 1
-RX2=$(cat /proc/net/dev | grep "$INTERFACE" | awk '{print $2}')
-BPS=$((RX2 - RX1))
-MBPS=$((BPS * 8 / 1000000))
-GBPS=$(echo "scale=2; $BPS * 8 / 1000000000" | bc 2>/dev/null || echo "0")
+# 3. CHẨN ĐOÁN CHI TIẾT
+NFT_LIST=$(nft list table netdev antiddos_v2 2>/dev/null)
+LAYERS=""
+[ -n "$(echo "$NFT_LIST" | grep "drop_geoip")" ] && LAYERS+="- 🌏 Geo-Shield (VN/JP Only)\n"
+[ -n "$(echo "$NFT_LIST" | grep "drop_raknet")" ] && LAYERS+="- 🤖 DPI RakNet Filter\n"
+[ -n "$(echo "$NFT_LIST" | grep "drop_udp_ratelimit")" ] && LAYERS+="- 🌊 UDP Rate Limit\n"
 
-# 2. CHẨN ĐOÁN LOẠI TẤN CÔNG (Dựa trên Nftables counter)
-DROPPED=$(nft list table netdev antiddos_v2 2>/dev/null | grep "drop" | awk '{sum+=$NF} END {print sum}')
-# Đảm bảo các biến luôn là số nguyên để tránh lỗi so sánh
-MBPS=${MBPS:-0}
-DROPPED=${DROPPED:-0}
-[[ ! "$MBPS" =~ ^[0-9]+$ ]] && MBPS=0
-[[ ! "$DROPPED" =~ ^[0-9]+$ ]] && DROPPED=0
-
-# Mặc định là ổn định
-ATTACK_TYPE="✅ Hệ thống Ổn định / Bình thường"
-
-# Phân tích sâu hơn các quy tắc có số lượng gói tin bị chặn (counter > 0)
-if [ "$DROPPED" -gt 0 ]; then
-    ATTACK_TYPE="⚔️ Botnet / Application Attack"
-    
-    # Kiểm tra từng rule cụ thể
-    if nft list table netdev antiddos_v2 2>/dev/null | grep "tcp flags & (fin|syn) == (fin|syn)" | grep -v "packets 0" >/dev/null; then
-        ATTACK_TYPE="🧨 TCP SYN/Malformed Flood"
-    elif nft list table netdev antiddos_v2 2>/dev/null | grep "0x00ffff00fefefefefdfdfdfd12345678" | grep -v "packets 0" >/dev/null; then
-        ATTACK_TYPE="🤖 Minecraft RakNet Join-Bot"
-    elif nft list table netdev antiddos_v2 2>/dev/null | grep "ip frag-off" | grep -v "packets 0" >/dev/null; then
-        ATTACK_TYPE="🧩 Fragmented IP Attack"
-    elif nft list table netdev antiddos_v2 2>/dev/null | grep "udp dport" | grep -v "packets 0" >/dev/null; then
-        ATTACK_TYPE="🌊 UDP Volumetric Flood"
+ATTACK_TYPE="Hệ thống Ổn định"
+if [ "$IS_ATTACK" = true ]; then
+    ATTACK_TYPE="Phát hiện lưu lượng bất thường"
+    if echo "$NFT_LIST" | grep "drop_invalid_tcp_flags" | grep -v "packets 0" >/dev/null; then ATTACK_TYPE="TCP SYN/Malformed Flood";
+    elif echo "$NFT_LIST" | grep "drop_raknet_dpi" | grep -v "packets 0" >/dev/null; then ATTACK_TYPE="Minecraft Join-Bot Attack";
+    elif echo "$NFT_LIST" | grep "drop_geoip_untrusted" | grep -v "packets 0" >/dev/null; then ATTACK_TYPE="Foreign IP Volumetric (Blocked)";
     fi
 fi
 
-# 3. CHẾ ĐỘ GỬI TIN NHẮN (Gửi định kỳ hoặc Khi bị tấn công)
-TIMESTAMP=$(date '+%d/%m/%Y %H:%M:%S')
-IS_ATTACK=false
-[ "$MBPS" -gt 50 ] || [ "$DROPPED" -gt 5000 ] && IS_ATTACK=true
+# 4. TÀI NGUYÊN & TOP IP
+CPU=$(top -bn1 | grep "Cpu(s)" | awk '{print 100 - $8}')
+RAM_P=$(free | grep Mem | awk '{print int($3/$2 * 100)}')
+[ "$CPU" -gt 80 ] && CPU_ICON="🔴" || CPU_ICON="🟢"
+[ "$RAM_P" -gt 80 ] && RAM_ICON="🔴" || RAM_ICON="🟢"
 
-# Màu sắc: Đỏ nếu bị ddos, Xanh nếu ổn định
-COLOR=5814783
-TITLE="📡 [BÁO CÁO ĐỊNH KỲ] PTERODACTYL NODE"
-if [ "$IS_ATTACK" = true ]; then
-    COLOR=15548997
-    TITLE="🔥 [CẢNH BÁO ĐANG BỊ DDOS] V2 SIÊU CƯỜNG"
-fi
+TOP_IPS=$(ss -tun state established 2>/dev/null | awk 'NR>1 {split($5,a,":"); print a[1]}' | grep -P '^\d' | sort | uniq -c | sort -nr | head -n 3 | awk '{print $2 " (" $1 ")"}' | tr '\n' ' | ' | sed 's/ | $//')
 
+# 5. GỬI WEBHOOK
+TIMESTAMP=$(date '+%H:%M:%S - %d/%m/%Y')
 PAYLOAD=$(cat <<JSON
 {
+  "username": "Anti-DDoS V2 Guardian",
+  "avatar_url": "https://i.imgur.com/8N88PNC.png",
   "embeds": [{
-    "title": "$TITLE",
+    "title": "$ICON [TRẠNG THÁI HỆ THỐNG]: $SEVERITY",
+    "description": "🛡️ **Màng chắn Ingress đang hoạt động bền bỉ.**",
     "color": $COLOR,
     "fields": [
-      { "name": "⏱️ Lõi Mạng (Ping)", "value": "\`$(ping -c 1 8.8.8.8 | awk -F '/' 'END {printf "%.0f\n", $5}')ms\`", "inline": true },
-      { "name": "🚀 Băng thông (Gbps)", "value": "\`${GBPS} Gbps (${MBPS} Mbps)\`", "inline": true },
-      { "name": "📡 Loại lưu lượng", "value": "\`${ATTACK_TYPE}\`", "inline": false },
-      { "name": "🧱 Gói tin bị ép chết", "value": "🔥 \`${DROPPED}\` Gói tin rác", "inline": true },
-      { "name": "💻 Tài Nguyên", "value": "CPU: \`$(top -bn1 | grep 'Cpu(s)' | awk '{print 100 - $8}')%\` | RAM Trống: \`$(free -m | awk '/Mem:/ {print $4}')MB\`", "inline": true },
-      { "name": "🔍 TOP 3 IP KẾT NỐI", "value": "\`$(ss -tun state established | awk 'NR>1 {print $5}' | sed -E 's/.*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*/\1/' | grep -v '127.0.0.1' | sort | uniq -c | sort -nr | head -n 3 | awk '{print $2 " (" $1 ")"}' | tr '\n' ' | ')\`", "inline": false }
+      { "name": "🚀 Lưu lượng Mạng", "value": "Tốc độ: \`${MBPS} Mbps\`\nChặn mới: \`${DROPS_IN_PERIOD} pkt/m\`", "inline": true },
+      { "name": "📊 Thống kê Ngày", "value": "Tổng chặn: \`${DAILY_COUNT}\` pkts\nKết nối: \`$(ss -tan | wc -l)\` cns", "inline": true },
+      { "name": "📡 Phân tích Tấn công", "value": "**$ATTACK_TYPE**", "inline": false },
+      { "name": "🧱 Các lớp phòng vệ đang bật", "value": "$LAYERS", "inline": false },
+      { "name": "💻 Sức khỏe Server", "value": "$CPU_ICON CPU: \`${CPU}%\` | $RAM_ICON RAM: \`${RAM_P}%\`", "inline": true },
+      { "name": "🔍 Top 3 IP đáng chú ý", "value": "\`${TOP_IPS:-Không có}\`", "inline": false }
     ],
-    "footer": { "text": "Hệ thống Anti-DDoS V2 Agent • $TIMESTAMP" }
+    "footer": { "text": "Hệ thống bảo vệ bởi Agentic AI • $TIMESTAMP" }
   }]
 }
 JSON
 )
 
-# Gửi tin nhắn (Nếu là Alert thì gửi ngay, nếu là Report thì Cronjob lo)
 curl -s -H "Content-Type: application/json" -X POST -d "$PAYLOAD" "$WEBHOOK" >/dev/null 2>&1
+

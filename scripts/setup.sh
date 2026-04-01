@@ -46,13 +46,13 @@ nft add chain netdev antiddos_v2 ingress { type filter hook ingress device "$INT
 
 # --- FILTER LAYER 1: CHẶN RÁC NGAY LẬP TỨC ---
 # 1. Chặn Invalid Packets (Malformed)
-nft add rule netdev antiddos_v2 ingress tcp flags \& \(fin\|syn\|rst\|psh\|ack\|urg\) == 0 drop
-nft add rule netdev antiddos_v2 ingress tcp flags \& \(fin\|syn\) == \(fin\|syn\) drop
-nft add rule netdev antiddos_v2 ingress tcp flags \& \(syn\|rst\) == \(syn\|rst\) drop
-nft add rule netdev antiddos_v2 ingress tcp flags \& \(fin\|rst\) == \(fin\|rst\) drop
+nft add rule netdev antiddos_v2 ingress tcp flags \& \(fin\|syn\|rst\|psh\|ack\|urg\) == 0 counter drop comment \"drop_invalid_tcp_flags\"
+nft add rule netdev antiddos_v2 ingress tcp flags \& \(fin\|syn\) == \(fin\|syn\) counter drop comment \"drop_invalid_tcp_flags\"
+nft add rule netdev antiddos_v2 ingress tcp flags \& \(syn\|rst\) == \(syn\|rst\) counter drop comment \"drop_invalid_tcp_flags\"
+nft add rule netdev antiddos_v2 ingress tcp flags \& \(fin\|rst\) == \(fin\|rst\) counter drop comment \"drop_invalid_tcp_flags\"
 
 # 2. Chặn Port Scan & Fragmented Packet
-nft add rule netdev antiddos_v2 ingress ip frag-off \& 0x1fff != 0 drop
+nft add rule netdev antiddos_v2 ingress ip frag-off \& 0x1fff != 0 counter drop comment \"drop_fragmented\"
 
 # 3. Chốt chặn IP Quốc gia (Dùng Geo-Set từ scripts/update-geoip.sh)
 echo "[4/6] Đang liên kết Geo-Shield vào tầng Ingress..."
@@ -63,7 +63,7 @@ ipset list allow_countries | grep -E '^[0-9]' | xargs -I {} nft add element netd
 # --- FILTER LAYER 4: RAKNET DEEP FILTER (MINECRAFT) ---
 echo "[5/6] Đang kích hoạt RakNet Deep Filter (DPI)..."
 # Logic: Chỉ cho phép gói tin UDP có Magic Bytes của RakNet OpenConnectionRequest
-nft add rule netdev antiddos_v2 ingress udp dport { 19132, 19133 } @th,160,128 != 0x00ffff00fefefefefdfdfdfd12345678 drop
+nft add rule netdev antiddos_v2 ingress udp dport { 19132, 19133 } @th,160,128 != 0x00ffff00fefefefefdfdfdfd12345678 counter drop comment \"drop_raknet_dpi\"
 
 # --- STATELESS BYPASS (NOTRACK) ---
 echo "      -> Kích hoạt Stateless Prerouting (Băng qua bảng Conntrack)..."
@@ -82,10 +82,10 @@ nft add rule netdev antiddos_v2 ingress ip saddr { 127.0.0.0/8, 172.16.0.0/12, 1
 nft add rule netdev antiddos_v2 ingress tcp dport 22 limit rate 10/second accept
 
 # Các port game: Chỉ VN/JP
-nft add rule netdev antiddos_v2 ingress ip saddr != @allow_countries udp dport { $GAME_PORTS } drop
+nft add rule netdev antiddos_v2 ingress ip saddr != @allow_countries udp dport { $GAME_PORTS } counter drop comment \"drop_geoip_untrusted\"
 
 # --- RATE LIMIT CHUYÊN SÂU ---
-nft add rule netdev antiddos_v2 ingress udp dport { $GAME_PORTS } limit rate over 100/second burst 200 packets counter drop
+nft add rule netdev antiddos_v2 ingress udp dport { $GAME_PORTS } limit rate over 100/second burst 200 packets counter drop comment \"drop_udp_ratelimit\"
 
 # 6. LƯU CẤU HÌNH VĨNH VIỄN (PERSISTENCE)
 echo "[6/7] Đang lưu cấu hình vĩnh viễn (Persistence)..."
