@@ -36,8 +36,9 @@ echo "      -> Thiết lập Lịch cập nhật IP VN/JP hàng tuần..."
 # 5. CẤU HÌNH NFTABLES (SIÊU CẤP TỐC ĐỘ)
 echo "[3/6] Đang thiết lập Nftables Ingress Hook (Layer 1)..."
 
-# Xóa cấu hình nftables cũ
-nft flush ruleset
+# Xóa cấu hình antiddos cũ (Chỉ xóa bảng riêng của script, giữ nguyên rules của Docker)
+nft delete table netdev antiddos_v2 2>/dev/null
+nft delete table ip raw_bypass 2>/dev/null
 
 # Tạo bảng Ingress (Tầng Driver)
 nft add table netdev antiddos_v2
@@ -93,7 +94,7 @@ systemctl enable --now nftables >/dev/null 2>&1
 
 # 7. FAILSAFE 5 PHÚT (Bảo hiểm cho User)
 echo -e "\n[7/7] Thiết lập chế độ tự giải cứu (5 phút)..."
-( sleep 300 && nft flush ruleset && echo -e "\n[!!!] SERVER ĐÃ TỰ ĐỘNG XÓA FIREWALL VÌ BẠN KHÔNG TẮT FAIL-SAFE.\n" > /dev/pts/0 2>/dev/null ) &
+( sleep 300 && (nft delete table netdev antiddos_v2 2>/dev/null; nft delete table ip raw_bypass 2>/dev/null) && echo -e "\n[!!!] SERVER ĐÃ TỰ ĐỘNG XÓA FIREWALL VÌ BẠN KHÔNG TẮT FAIL-SAFE.\n" > /dev/pts/0 2>/dev/null ) &
 FAILSAFE_PID=$!
 echo "$FAILSAFE_PID" > /tmp/antiddos_failsafe.pid
 

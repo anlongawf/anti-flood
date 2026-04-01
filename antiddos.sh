@@ -76,7 +76,7 @@ fi
 # 4. KÍCH HOẠT QUẢ BOMB RỦI RO (HỦY THÀNH QUẢ TỰ ĐỘNG SAU 5 PHÚT NẾU LỖI)
 if [ "$FAST_MODE" = false ]; then
 echo "[4/6] Thiếp lập chế độ 5 phút tự cứu (Tránh bị khóa nhầm...)"
-( sleep 300 && iptables -F && iptables -t nat -F && iptables -t mangle -F && echo -e "\n\n[!!!] SERVER ĐÃ TỰ ĐỘNG XÓA FIREWALL VÌ BẠN KHÔNG TẮT FAIL-SAFE TRONG 5 PHÚT.\n" > /dev/pts/0 2>/dev/null ) &
+( sleep 300 && iptables -F INPUT && iptables -F DOCKER-USER && echo -e "\n\n[!!!] SERVER ĐÃ TỰ ĐỘNG XÓA FIREWALL VÌ BẠN KHÔNG TẮT FAIL-SAFE TRONG 5 PHÚT.\n" > /dev/pts/0 2>/dev/null ) &
 FAILSAFE_PID=$!
 echo "$FAILSAFE_PID" > /tmp/antiddos_failsafe.pid
 fi
