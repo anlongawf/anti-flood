@@ -56,8 +56,9 @@ chmod +x setup_monitor.sh && sudo ./setup_monitor.sh
 
 ---
 
-## 🛡️ Tính Năng Nổi Bật
-- **Lọc Địa Lý Tốc Độ Cao:** Dùng `ipset` để xử lý hàng nghìn dải IP mà không làm lag CPU.
-- **Giáp Kép Minecraft:** Bảo vệ cả Java (25565 - TCP) và Bedrock (19132 - UDP).
-- **Chống Bot Join:** Giới hạn 20 kết nối TCP đồng thời để ngăn chặn các cuộc tấn công proxy-bot.
-- **Ưu tiên Mạng Nội Bộ:** Không bao giờ chặn giao tiếp giữa các Container (DNS, Wings API).
+## 🗑️ Gỡ Cài Đặt (Uninstall)
+Nếu bạn không còn muốn sử dụng hệ thống Anti-Flood nữa, hãy chạy lệnh sau để dọn dẹp sạch sẽ:
+```bash
+chmod +x uninstall.sh && sudo ./uninstall.sh
+```
+Lệnh này sẽ gỡ bỏ mọi quy tắc firewall, dịch vụ chạy ngầm và cấu hình nhân mà script đã cài đặt.
