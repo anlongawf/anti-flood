@@ -103,10 +103,6 @@ show_dashboard() {
     echo -e "${GRAY}Refresh: 1s | Watcher: ACTIVE | Press Ctrl+C to exit${NC}"
 }
 
-    echo -e "\n${GRAY}----------------------------------------------------------${NC}"
-    echo -e "${GRAY}Bấm Ctrl+C để thoát Dashboard. (Refresh: 1s)${NC}"
-}
-
 # MAIN LOOP
 if [[ "$1" == "--watch" ]]; then
     while true; do
