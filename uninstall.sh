@@ -22,14 +22,16 @@ if systemctl is-active --quiet xdpfw.service; then
 fi
 rm -f /etc/systemd/system/xdpfw.service
 
-# Guardian Service
-if systemctl is-active --quiet antiddos-guardian.service; then
-    systemctl stop antiddos-guardian.service
-    systemctl disable antiddos-guardian.service
-    echo "      -> Đã dừng antiddos-guardian.service"
+# Guardian/Watcher Service
+if systemctl is-active --quiet antiddos-watcher.service; then
+    systemctl stop antiddos-watcher.service
+    systemctl disable antiddos-watcher.service
+    echo "      -> Đã dừng antiddos-watcher.service"
 fi
-rm -f /etc/systemd/system/antiddos-guardian.service
-pkill -f "guardian.sh|watcher_v3.sh" 2>/dev/null
+rm -f /etc/systemd/system/antiddos-watcher.service
+rm -f /usr/local/bin/antiddos_watcher.sh
+
+pkill -f "guardian.sh|watcher_v3.sh|antiddos_watcher.sh" 2>/dev/null
 systemctl daemon-reload
 
 # 2. GỠ BỎ FAIL2BAN (QUAN TRỌNG)

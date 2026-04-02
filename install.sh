@@ -45,14 +45,21 @@ bash "$SCRIPT_DIR/scripts/setup_fail2ban.sh"
 
 # 7. GIAI ĐOẠN 5: KÍCH HOẠT DỊCH VỤ VÀ WATCHER
 echo -e "\n\033[1;36m[5/5] Hoàn tất và kích hoạt bảo vệ liên tục...\033[0m"
+
+# Kích hoạt XDP-Firewall Service
 systemctl enable --now xdpfw 2>/dev/null
 systemctl start xdpfw 2>/dev/null
 
-# Khởi chạy Watcher V3 trong nền (Systemd hoặc nohup)
-# Tôi dùng nohup để đơn giản hóa cho User, có thể chuyển sang service sau.
-pkill -f watcher_v3.sh 2>/dev/null
-nohup bash "$SCRIPT_DIR/scripts/watcher_v3.sh" > /dev/null 2>&1 &
+# Thiết lập Watcher Service (Tự chạy lại khi Reboot)
+cp "$SCRIPT_DIR/configs/antiddos-watcher.service" /etc/systemd/system/
+cp "$SCRIPT_DIR/scripts/watcher_v3.sh" /usr/local/bin/antiddos_watcher.sh
+chmod +x /usr/local/bin/antiddos_watcher.sh
+
+systemctl daemon-reload
+systemctl enable --now antiddos-watcher 2>/dev/null
+systemctl start antiddos-watcher 2>/dev/null
 
 echo -e "\n\033[1;32m[✔] TẤT CẢ ĐÃ SẴN SÀNG! HỆ THỐNG V3 ULTIMATE ĐANG BẢO VỆ BẠN.\033[0m"
+echo -e "Hệ thống sẽ tự động khởi động cùng máy chủ (Auto-start on boot)."
 echo -e "Hãy dùng \033[1;33mbash status.sh --watch\033[0m để xem chiến sự ddos XDP."
 echo -e "Lệnh gỡ cài đặt: \033[1;33msudo ./uninstall.sh\033[0m\n"

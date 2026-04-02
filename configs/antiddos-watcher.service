@@ -1,0 +1,16 @@
+[Unit]
+Description=Anti-DDoS V3 Pterodactyl Watcher Service
+After=network.target network-online.target xdpfw.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Sửa đường dẫn nếu thư mục cài đặt khác
+ExecStart=/bin/bash /usr/local/bin/antiddos_watcher.sh
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/antiddos_watcher.log
+StandardError=append:/var/log/antiddos_watcher.log
+
+[Install]
+WantedBy=multi-user.target
