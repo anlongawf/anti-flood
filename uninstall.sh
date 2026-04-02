@@ -44,11 +44,11 @@ if [ -f /etc/fail2ban/jail.d/xdpfw.local ]; then
     echo "      -> Đã dọn dẹp Jail/Filter/Action của Fail2Ban."
 fi
 
-# 3. GỠ BỎ CRONJOBS (MONITOR & GEOIP)
+# 3. GỠ BỎ CRONJOBS (MONITOR & GEOIP & REPORT)
 echo -e "[3/5] Đang dọn dẹp các lịch trình tự động (Cronjobs)..."
 # Lưu crontab hiện tại, xóa các dòng liên quan và nạp lại
-crontab -l 2>/dev/null | grep -v -E "antiddos_monitor.sh|update-geoip.sh|alerts.sh|watcher_v3.sh" | crontab -
-echo "      -> Đã xóa các lịch trình Monitor và GeoIP."
+crontab -l 2>/dev/null | grep -v -E "antiddos_monitor.sh|update-geoip.sh|alerts.sh|watcher_v3.sh|discord_report.sh" | crontab -
+echo "      -> Đã xóa các lịch trình Monitor, GeoIP và Discord Report."
 
 # 4. DỌN DEP TỆP TIN VÀ CẤU HÌNH NHÂN (KERNEL)
 echo -e "[4/5] Đang xóa các tệp cấu hình và script hệ thống..."

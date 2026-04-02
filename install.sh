@@ -62,6 +62,14 @@ systemctl daemon-reload
 systemctl enable --now antiddos-watcher 2>/dev/null
 systemctl start antiddos-watcher 2>/dev/null
 
+# 8. THIẾT LẬP BÁO CÁO DISCORD ĐỊNH KỲ (1 PHÚT)
+if [ -n "$DISCORD_WEBHOOK" ]; then
+    echo -e "\n\033[1;36m[6/6] Đang thiết lập Báo cáo Discord định kỳ (1 Phút)...\033[0m"
+    chmod +x "$SCRIPT_DIR/scripts/discord_report.sh"
+    (crontab -l 2>/dev/null | grep -v "discord_report.sh"; echo "* * * * * $SCRIPT_DIR/scripts/discord_report.sh") | crontab -
+    echo "      -> Đã kích hoạt báo cáo định kỳ 1 phút/lần."
+fi
+
 echo -e "\n\033[1;32m[✔] TẤT CẢ ĐÃ SẴN SÀNG! HỆ THỐNG V3 ULTIMATE ĐANG BẢO VỆ BẠN.\033[0m"
 echo -e "Hệ thống sẽ tự động khởi động cùng máy chủ (Auto-start on boot)."
 echo -e "Hãy dùng \033[1;33mbash status.sh --watch\033[0m để xem chiến sự ddos XDP."
