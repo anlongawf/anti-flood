@@ -49,11 +49,12 @@ fi
 echo -e "\n\033[1;36m[2/5] Triển khai Giáp V2 chuyên sâu...\033[0m"
 sudo bash scripts/setup.sh
 
-# 4. Kích hoạt Guardian (Chạy ngầm)
+# 4. Kích hoạt Guardian (Chạy ngầm bằng Systemd)
 echo -e "\n\033[1;36m[3/5] Triển khai Cảnh vệ Guardian (Self-Healing)...\033[0m"
-# Tìm và tắt Guardian cũ nếu có
-pkill -f guardian.sh
-nohup bash Advanced_AntiDDoS/Backend_Node/guardian.sh > /dev/null 2>&1 &
+# Tìm và tắt Guardian nohup cũ nếu có để chuyển sang Systemd
+pkill -f guardian.sh 2>/dev/null
+chmod +x Advanced_AntiDDoS/Backend_Node/install_guardian.sh
+./Advanced_AntiDDoS/Backend_Node/install_guardian.sh
 
 # 5. Cài đặt Unified Monitor & Alerts
 echo -e "\n\033[1;36m[4/5] Thiết lập Lịch Báo cáo V2 & Cảnh báo (Crontab)...\033[0m"

@@ -25,13 +25,15 @@ fi
 echo "[2/6] Card mạng đang hoạt động: $INTERFACE"
 
 # 4. CHẠY CÁC MODULE LAYER 2 & 3
-bash scripts/optimize-kernel.sh
-bash scripts/update-geoip.sh
+# Tự động xác định BASE_DIR để tránh lỗi Hardcoded path
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+bash "$BASE_DIR/scripts/optimize-kernel.sh"
+bash "$BASE_DIR/scripts/update-geoip.sh"
 
 # 4.1. THIẾT LẬP CRONJOB CẬP NHẬT IP HÀNG TUẦN (CHỦ NHẬT)
 echo "      -> Thiết lập Lịch cập nhật IP VN/JP hàng tuần..."
 (crontab -l 2>/dev/null | grep -v "update-geoip.sh" | crontab -)
-(crontab -l 2>/dev/null; echo "0 0 * * 0 bash /Users/anphan/Documents/block_ip/scripts/update-geoip.sh >/dev/null 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 0 * * 0 bash $BASE_DIR/scripts/update-geoip.sh >/dev/null 2>&1") | crontab -
 
 # 5. CẤU HÌNH NFTABLES (SIÊU CẤP TỐC ĐỘ)
 echo "[3/6] Đang thiết lập Nftables Ingress Hook (Layer 1)..."
