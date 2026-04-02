@@ -4,6 +4,7 @@
 # ==========================================================
 
 echo -e "\033[1;36m[+] Đang cài đặt và kết nối Fail2Ban với XDP-Firewall...\033[0m"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 1. CÀI ĐẶT FAIL2BAN
 apt-get update -y >/dev/null

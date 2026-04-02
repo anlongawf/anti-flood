@@ -29,12 +29,22 @@ chmod +x install.sh
 ./install.sh --libxdp
 
 # 5. DI CHUYỂN NHỊ PHÂN VÀO HỆ THỐNG
-if [ -f xdpfw ] && [ -f xdpfw-add ]; then
-    cp xdpfw /usr/local/bin/
-    cp xdpfw-add /usr/local/bin/
-    cp xdpfw-del /usr/local/bin/
+# XDP-Firewall installer might put them in /usr/bin. We want them in /usr/local/bin for consistency.
+XDP_PATH="build/loader/xdpfw"
+XDP_ADD_PATH="build/rule_add/xdpfw-add"
+XDP_DEL_PATH="build/rule_del/xdpfw-del"
+
+if [ -f "$XDP_PATH" ]; then
+    cp "$XDP_PATH" /usr/local/bin/xdpfw
+    cp "$XDP_ADD_PATH" /usr/local/bin/xdpfw-add
+    cp "$XDP_DEL_PATH" /usr/local/bin/xdpfw-del
     chmod +x /usr/local/bin/xdpfw*
-    echo -e "\033[1;32m[✔] BIÊN DỊCH THÀNH CÔNG! xdpfw đã sẵn sàng.\033[0m"
+    echo -e "\033[1;32m[✔] BIÊN DỊCH THÀNH CÔNG! xdpfw đã sẵn sàng tại /usr/local/bin/.\033[0m"
+elif [ -f "/usr/bin/xdpfw" ] || [ -f "/usr/local/bin/xdpfw" ]; then
+    # Nếu bộ cài gốc đã tống vào /usr/bin rồi thì copy sang /usr/local/bin cho đồng bộ script
+    [ -f "/usr/bin/xdpfw" ] && cp /usr/bin/xdpfw* /usr/local/bin/ 2>/dev/null
+    chmod +x /usr/local/bin/xdpfw*
+    echo -e "\033[1;32m[✔] XDPFW ĐÃ ĐƯỢC CÀI ĐẶT VÀO HỆ THỐNG.\033[0m"
 else
     echo -e "\033[1;31m[✘] LỖI BIÊN DỊCH: Không tìm thấy file nhị phân xdpfw.\033[0m"
     exit 1
