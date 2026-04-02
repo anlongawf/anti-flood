@@ -21,12 +21,15 @@ bash "$SCRIPT_DIR/uninstall.sh" >/dev/null 2>&1
 echo "      -> Đã giải phóng hoàn toàn Iptables/Nftables/Ipset cũ."
 
 # 3. GIAI ĐOẠN 1: NHẬP THÔNG TIN TỪ USER
-echo -e "\n\033[1;36m[1/5] Thiết lập tham số dải Port (Pterodactyl Allocation Pool)...\033[0m"
+echo -e "\n\033[1;36m[1/5] Thiết lập tham số hệ thống (Inputs)...\033[0m"
 read -r -p "[?] Nhập dải Port Pterodactyl của bạn (Ví dụ: 30000-35000): " PTERO_POOL
 [ -z "$PTERO_POOL" ] && PTERO_POOL="30000-30100"
 
+read -r -p "[?] Nhập Discord Webhook URL (Để trống nếu không dùng): " DISCORD_WEBHOOK
+
 mkdir -p /etc/xdpfw
 echo "$PTERO_POOL" > /etc/xdpfw/pterodactyl_pool.txt
+echo "$DISCORD_WEBHOOK" > /etc/xdpfw/webhook.txt
 
 # 4. GIAI ĐOẠN 2: BIÊN DỊCH VÀ CÀI ĐẶT XDP-FIREWALL
 echo -e "\n\033[1;36m[2/5] Đang build giáp Driver XDP (Gamemann Core)...\033[0m"
