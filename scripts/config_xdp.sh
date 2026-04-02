@@ -105,7 +105,30 @@ cat <<EOF >> "$XDP_CONF_FILE"
 );
 EOF
 
-# 3. TẠO SYSTEMD SERVICE (Nếu chưa có)
+# 3. THIẾT LẬP GEO-SHIELD LAYER (NFTABLES)
+echo "[+] Đang kích hoạt Geo-Shield Level 2 (VN/JP Nftables)..."
+# Tạo Table Nftables để lọc IP Quốc Gia cho Game Ports
+nft delete table inet antiddos_geo 2>/dev/null
+nft add table inet antiddos_geo
+nft add chain inet antiddos_geo prerouting { type filter hook prerouting priority -150 \; policy accept \; }
+
+# Tạo Set trong Nftables từ IPSET (Đồng bộ)
+nft add set inet antiddos_geo allow_countries { type ipv4_addr \; flags interval \; }
+ipset list allow_countries | grep -E '^[0-9]' | xargs -n1 -I {} nft add element inet antiddos_geo allow_countries { {} } 2>/dev/null
+
+# Áp dụng luật DROP: Nếu không thuộc VN/JP mà truy cập Port Game/Pool thì DROP ngay
+if [ -n "$ACTIVE_PTERO_PORTS" ]; then
+    nft add rule inet antiddos_geo prerouting ip saddr != @allow_countries udp dport { $ACTIVE_PTERO_PORTS } counter drop comment \"geo_block_ptero\"
+fi
+
+# Chặn nốt dải Pool Pterodactyl
+nft add rule inet antiddos_geo prerouting ip saddr != @allow_countries udp dport { $PTERO_POOL } counter drop comment \"geo_block_pool\"
+nft add rule inet antiddos_geo prerouting ip saddr != @allow_countries tcp dport { $PTERO_POOL } counter drop comment \"geo_block_pool\"
+
+# Tinh chỉnh Kernel (Bổ trợ)
+sysctl -w net.ipv4.conf.all.rp_filter=1 >/dev/null
+
+# 4. TẠO SYSTEMD SERVICE (Nếu chưa có)
 if [ ! -f /etc/systemd/system/xdpfw.service ]; then
 cat <<EOF > /etc/systemd/system/xdpfw.service
 [Unit]
@@ -129,4 +152,4 @@ EOF
 systemctl daemon-reload
 fi
 
-echo -e "\033[1;32m[✔] ĐÃ TẠO CẤU HÌNH XDP THÀNH CÔNG!\033[0m"
+echo -e "\033[1;32m[✔] ĐÃ TẠO CẤU HÌNH XDP & GEO-SHIELD THÀNH CÔNG!\033[0m"

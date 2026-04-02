@@ -35,8 +35,11 @@ echo "$DISCORD_WEBHOOK" > /etc/xdpfw/webhook.txt
 echo -e "\n\033[1;36m[2/5] Đang build giáp Driver XDP (Gamemann Core)...\033[0m"
 bash "$SCRIPT_DIR/scripts/compile_xdp.sh"
 
-# 5. GIAI ĐOẠN 3: CẤU HÌNH VÀ TỐI ƯU HỎA HỆ THỐNG
-echo -e "\n\033[1;36m[3/5] Đang kích hoạt Port Discovery & Config Generator...\033[0m"
+# 5. GIAI ĐOẠN 3: CẤU HÌNH VÀ TỐI ƯU HÓA HỆ THỐNG
+echo -e "\n\033[1;36m[3/5] Đang kích hoạt Geo-Shield (VN/JP) & Config Generator...\033[0m"
+# Cập nhật danh sách IP VN và JP
+bash "$SCRIPT_DIR/scripts/update-geoip.sh"
+# Tạo cấu hình XDP
 bash "$SCRIPT_DIR/scripts/config_xdp.sh"
 
 # 6. GIAI ĐOẠN 4: KẾT NỐI FAIL2BAN GUARDIAN
