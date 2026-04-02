@@ -40,19 +40,36 @@ get_pterodactyl_ports() {
     echo "$PORTS" | xargs -n1 | sort -n | uniq | xargs | tr ' ' ','
 }
 
-# 4. XUẤT KẾT QUẢ (Dạng biến để script khác nạp)
+# 4. DANH SÁCH IP NGƯỜI DÙNG & MẠNG NỘI BỘ (WHITELIST)
+get_whitelist_ips() {
+    # Mạng nội bộ cơ bản
+    local WHITELIST="127.0.0.1/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1"
+    
+    # Tự động lấy IP của người đang SSH hiện tại (Tránh tự khóa mình)
+    local SSH_IP=$(echo $SSH_CONNECTION | awk '{print $1}')
+    if [ -n "$SSH_IP" ]; then
+        WHITELIST="$WHITELIST,$SSH_IP"
+    fi
+    
+    echo "$WHITELIST"
+}
+
+# 5. XUẤT KẾT QUẢ (Dạng biến để script khác nạp)
 INTERFACE=$(get_interface)
 ADMIN_PORTS=$(get_admin_ports)
 ACTIVE_PTERO_PORTS=$(get_pterodactyl_ports)
+WHITELIST_IPS=$(get_whitelist_ips)
 
 if [[ "$1" == "--shell" ]]; then
     echo "INTERFACE=\"$INTERFACE\""
     echo "ADMIN_PORTS=\"$ADMIN_PORTS\""
     echo "ACTIVE_PTERO_PORTS=\"$ACTIVE_PTERO_PORTS\""
+    echo "WHITELIST_IPS=\"$WHITELIST_IPS\""
 else
     echo "------------------------------------------------"
-    echo "INTERACE: $INTERFACE"
+    echo "INTERFACE: $INTERFACE"
     echo "ADMIN PORTS (Auto): $ADMIN_PORTS"
     echo "PTERO PORTS (Active): ${ACTIVE_PTERO_PORTS:-None}"
+    echo "WHITELIST IPS: $WHITELIST_IPS"
     echo "------------------------------------------------"
 fi

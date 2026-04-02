@@ -9,7 +9,7 @@ XDP_CONF_FILE="/etc/xdpfw/xdpfw.conf"
 POOL_FILE="/etc/xdpfw/pterodactyl_pool.txt"
 
 # 1. ĐỌC DỮ LIỆU TỪ DISCOVERY
-# Nạp các biến INTERFACE, ADMIN_PORTS, ACTIVE_PTERO_PORTS
+# Nạp các biến INTERFACE, ADMIN_PORTS, ACTIVE_PTERO_PORTS, WHITELIST_IPS
 eval $(bash "$SCRIPT_DIR/discover_v3.sh" --shell)
 
 # Lấy dải Port Pool từ file hoặc mặc định
@@ -34,13 +34,28 @@ stdout_update_time = 2000;
 
 filters = (
     // -------------------------------------------------------------
-    // NHÓM 1: WHITELIST ADMIN (Auto-detected)
+    // NHÓM 0: WHITELIST IP TIN CẬY (Không bao giờ Ban)
     // -------------------------------------------------------------
     {
         enabled = true,
-        action = 1,          // Allow Admin Ports
+        action = 1,          // Allow Whitelist IPs
+        src_ip = [ $WHITELIST_IPS ]
+    },
+
+    // -------------------------------------------------------------
+    // NHÓM 1: WHITELIST ADMIN PORTS (SSH, Wings, DB...)
+    // -------------------------------------------------------------
+    {
+        enabled = true,
+        action = 1,
         tcp_enabled = true,
         tcp_dport = [ $ADMIN_PORTS ]
+    },
+    {
+        enabled = true,
+        action = 1,
+        udp_enabled = true,
+        udp_dport = [ $ADMIN_PORTS ]
     },
 
     // -------------------------------------------------------------

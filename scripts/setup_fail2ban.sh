@@ -29,7 +29,12 @@ ignoreregex =
 EOF
 
 # 4. TẠO JAIL: XDPFW-GUARDIAN
-cat << 'EOF' > /etc/fail2ban/jail.d/xdpfw.local
+# Lấy danh sách Whitelist từ Discovery để nạp vào ignoreip
+eval $(bash "$SCRIPT_DIR/discover_v3.sh" --shell)
+# Chuyển đổi dấu phẩy trong whitelist thành dấu cách cho Fail2Ban
+F2B_IGNORE=$(echo $WHITELIST_IPS | tr ',' ' ')
+
+cat << EOF > /etc/fail2ban/jail.d/xdpfw.local
 [xdpfw-guardian]
 enabled = true
 backend = auto
@@ -39,7 +44,8 @@ action = xdpfw-action
 maxretry = 1
 findtime = 600
 bantime = 3600
-ignoreip = 127.0.0.1/8 ::1
+# Danh sách IP bỏ qua (Localhost + Mạng nội bộ + IP SSH hiện tại)
+ignoreip = 127.0.0.1/8 ::1 $F2B_IGNORE
 EOF
 
 # 5. KHỞI ĐỘNG LẠI FAIL2BAN
