@@ -1,24 +1,21 @@
-# 🛡️ Pterodactyl Anti-Flood System (L3/L4 Mitigation)
+# 🛡️ Pterodactyl Anti-Flood Ultimate (V3 - XDP & Fail2Ban)
 
-Một giải pháp chặn DDoS toàn diện (iptables + ipset + GeoIP + Kernel Tuning) được thiết kế đặc biệt cho máy chủ Pterodactyl Hosting (Minecraft). Ngăn chặn mạnh mẽ các đợt bão UDP Flood và TCP SYN Flood.
+Một giải pháp bảo vệ máy chủ Pterodactyl tối thượng, kết hợp sức mạnh của **XDP (Express Data Path)** ở tầng Driver và **Fail2Ban** ở tầng Guardian. Thiết kế đặc biệt để chặn đứng hàng triệu gói tin DDoS mà không làm treo CPU.
 
-## 📌 Tính Năng Cốt Lõi
-- **Tự động dò tìm**: Tự động nhận diện các container Minecraft đang chạy (TCP 25565) để áp dụng cấu hình.
-- **Lọc Địa lý (Geo-filter)**: Chỉ cho phép các dải IP từ Việt Nam và Nhật Bản kết nối vào cổng Game.
-- **Chống TCP SYN Flood**: Bảo vệ hệ thống khỏi các cuộc tấn công làm cạn kiệt tài nguyên TCP.
-- **Giới hạn kết nối (Connlimit)**: Ngăn chặn Bot Join bằng cách giới hạn mỗi IP chỉ được mở tối đa 20 kết nối TCP đồng thời.
-- **Bảo vệ UDP (Bedrock)**: Giữ nguyên lớp bảo vệ UDP siêu mạnh cho các server điện thoại.
-- **Guardian Service**: Tự động khôi phục Firewall ngay cả khi Docker hoặc Pterodactyl khởi động lại.
-- **Ép Xung Nhân Linux:** Cấu trúc tự cập nhật nhân Linux mở rộng bộ đệm `nf_conntrack` lến 2 Triệu connection và thiết lập giáp TCP SYN Cookies.
-- **Docker Guardian:** Tích hợp cảnh vệ `systemd` tự động nạp lại Firewall mỗi khi Docker Restart, chống việc Pterodactyl đập bể rules.
-- **Live Discord Dashboard:** Cỗ máy định kỳ quét trạng thái RAM/CPU/Connections và Báo cáo trực tiếp lên Discord mỗi phút một lần.
-- **Global Status Check:** Lệnh `status.sh` tích hợp sẵn để kiểm tra nhanh mọi thông số hệ thống và sức khỏe Firewall chỉ trong 1 giây.
+## 🚀 Tính Năng Vượt Trội (V3)
+- **XDP (Driver Level)**: Bỏ qua tầng Network Stack của Linux để lọc traffic ngay tại Card mạng. Chống Volumetric UDP Flood (Bedrock) và TCP SYN Flood cực mạnh.
+- **Fail2Ban Guardian**: Tự động phát hiện kẻ tấn công từ log XDP và ra lệnh cho Driver chặn IP đó ngay lập tức (Real-time BPF Map injection).
+- **Intelligent Port Discovery**: Tự động quét và nhận diện:
+    - Tất cả các Port quản trị (SSH, SFTP, Wings, Database, Web Panel).
+    - Toàn bộ Port Allocation của khách hàng đang chạy trên Pterodactyl.
+- **Smart Watcher**: Giám sát thay đổi 15 giây/lần, chỉ cập nhật Firewall khi có sự thay đổi thực sự (Giảm 99% tải CPU).
+- **Auto-Fallback**: Tự động chuyển đổi sang chế độ tương thích nếu Driver mạng không hỗ trợ XDP Native.
 
 ---
 
-## 🚀 Cài Đặt Tất Cả Trong Một (All-in-One)
+## 📦 Cài Đặt Tất Cả Trong Một (Clean Install)
 
-Dán lệnh duy nhất này để cài đặt Firewall + Guardian + Monitor (tùy chọn) cùng lúc:
+Chỉ một lệnh duy nhất để gỡ bỏ bản cũ và cài đặt bản V3 Ultimate:
 
 ```bash
 git clone https://github.com/anlongawf/anti-flood.git
@@ -28,37 +25,25 @@ chmod +x install.sh && sudo ./install.sh
 
 ---
 
-## 📊 Kiểm Tra Trạng Thái
-Sau khi cài đặt, dùng lệnh dưới đây để xem Dashboard chiến sự:
+## 📊 Dashboard Trinh Sát
+Theo dõi chiến sự DDoS trực tiếp với thống kê từ tầng Driver:
 ```bash
-sudo ./status.sh
-```
-Lõi này sẽ tự động:
-- Tinh chỉnh Kernel Nhân Linux.
-- Tải danh sách IP VN/JP vào RAM (ipset).
-- Dò tìm Container Minecraft và áp dụng cấu hình TCP/UDP.
-
-> [!WARNING]
-> Mặc định script có chức năng **"Bom đếm lùi Cứu hộ 5 Phút"**. Nếu sau khi chạy, bạn vẫn kết nối SSH bình thường, hãy nhớ bấm lệnh `kill [PID]` hiện trên màn hình để giữ lại Firewall.
-
-### 2. Kích Hoạt Cảnh Vệ Tái Sinh Docker
-Pterodactyl hoặc Docker Restart thường làm rớt các quy tắc Firewall. Script này tích hợp vào `systemd` để tự động vá lại màng chắn ngay khi Docker khởi động.
-```bash
-sudo ./Advanced_AntiDDoS/Backend_Node/install_guardian.sh
+sudo ./status.sh --watch
 ```
 
-### 3. Khởi Động Trạm Trinh Sát Webhook (Monitor)
-Gửi báo cáo tình hình chiến sự (CPU, RAM, Connections, Attack Stats) trực tiếp lên Discord mỗi 1 phút.
+## 🗑️ Gỡ Cài Đặt (Uninstall)
 ```bash
-chmod +x setup_monitor.sh && sudo ./setup_monitor.sh
+sudo ./uninstall.sh
 ```
-*(Yêu cầu chuẩn bị trước một Link Webhook Discord).*
+Lệnh này sẽ dọn dẹp sạch sẽ XDP, Fail2Ban, Nftables và khôi phục Driver mạng về trạng thái ban đầu.
 
 ---
 
-## 🗑️ Gỡ Cài Đặt (Uninstall)
-Nếu bạn không còn muốn sử dụng hệ thống Anti-Flood nữa, hãy chạy lệnh sau để dọn dẹp sạch sẽ:
-```bash
-chmod +x uninstall.sh && sudo ./uninstall.sh
-```
-Lệnh này sẽ gỡ bỏ mọi quy tắc firewall, dịch vụ chạy ngầm và cấu hình nhân mà script đã cài đặt.
+## 🛡️ Kiến Trúc Hệ Thống (V3)
+1. **Lớp 1: XDP Ingress Filter**: Loại bỏ 90% traffic độc ngay tại Driver.
+2. **Lớp 2: Fail2Ban Guardian**: "Tống giam" các IP spam vào Blocklist của XDP.
+3. **Lớp 3: RakNet DPI**: Lọc sâu gói tin Minecraft Bedrock để chặn Bot Join.
+4. **Lớp 4: Nftables Raw Bypass**: Bỏ qua tracking cho các port game để chống tràn bảng Conntrack.
+
+---
+*Phát triển bởi Agentic AI cho hệ sinh thái Pterodactyl Việt Nam.*

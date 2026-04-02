@@ -12,31 +12,54 @@ fi
 
 echo -e "\033[1;36m[+] ĐANG BẮT ĐẦU QUÁ TRÌNH GỠ CÀI ĐẶT TOÀN DIỆN...\033[0m"
 
-# 1. DỪNG VÀ GỠ BỎ SERVICES (GUARDIAN)
+# 1. DỪNG VÀ GỠ BỎ SERVICES (GUARDIAN & XDP)
 echo -e "\n[1/5] Đang xử lý các dịch vụ chạy ngầm..."
+# XDP Service
+if systemctl is-active --quiet xdpfw.service; then
+    systemctl stop xdpfw.service
+    systemctl disable xdpfw.service
+    echo "      -> Đã dừng xdpfw.service"
+fi
+rm -f /etc/systemd/system/xdpfw.service
+
+# Guardian Service
 if systemctl is-active --quiet antiddos-guardian.service; then
     systemctl stop antiddos-guardian.service
     systemctl disable antiddos-guardian.service
     echo "      -> Đã dừng antiddos-guardian.service"
 fi
 rm -f /etc/systemd/system/antiddos-guardian.service
-pkill -f guardian.sh 2>/dev/null
+pkill -f "guardian.sh|watcher_v3.sh" 2>/dev/null
 systemctl daemon-reload
 
-# 2. GỠ BỎ CRONJOBS (MONITOR & GEOIP)
-echo -e "[2/5] Đang dọn dẹp các lịch trình tự động (Cronjobs)..."
+# 2. GỠ BỎ FAIL2BAN (QUAN TRỌNG)
+echo -e "[2/5] Đang gỡ bỏ cấu hình Fail2Ban XDP..."
+if [ -f /etc/fail2ban/jail.d/xdpfw.local ]; then
+    rm -f /etc/fail2ban/jail.d/xdpfw.local
+    rm -f /etc/fail2ban/filter.d/xdpfw-filter.conf
+    rm -f /etc/fail2ban/action.d/xdpfw-action.conf
+    systemctl restart fail2ban 2>/dev/null
+    echo "      -> Đã dọn dẹp Jail/Filter/Action của Fail2Ban."
+fi
+
+# 3. GỠ BỎ CRONJOBS (MONITOR & GEOIP)
+echo -e "[3/5] Đang dọn dẹp các lịch trình tự động (Cronjobs)..."
 # Lưu crontab hiện tại, xóa các dòng liên quan và nạp lại
-crontab -l 2>/dev/null | grep -v -E "antiddos_monitor.sh|update-geoip.sh|alerts.sh" | crontab -
+crontab -l 2>/dev/null | grep -v -E "antiddos_monitor.sh|update-geoip.sh|alerts.sh|watcher_v3.sh" | crontab -
 echo "      -> Đã xóa các lịch trình Monitor và GeoIP."
 
-# 3. DỌN DEP TỆP TIN VÀ CẤU HÌNH NHÂN (KERNEL)
-echo -e "[3/5] Đang xóa các tệp cấu hình và script hệ thống..."
+# 4. DỌN DEP TỆP TIN VÀ CẤU HÌNH NHÂN (KERNEL)
+echo -e "[4/5] Đang xóa các tệp cấu hình và script hệ thống..."
 rm -f /usr/local/bin/antiddos_monitor.sh
+rm -f /usr/local/bin/xdpfw
+rm -f /usr/local/bin/xdpfw-add
+rm -f /usr/local/bin/xdpfw-del
 rm -rf /etc/antiddos_zones
+rm -rf /etc/xdpfw
 rm -f /etc/sysctl.d/99-antiddos-mc.conf
 rm -f /tmp/antiddos_failsafe.pid
 rm -f /tmp/antiddos_last_ports.txt
-rm -f /tmp/antiddos_last_ports.txt
+rm -f /tmp/antiddos_last_hash.txt
 
 # Reset cấu hình nhân nếu tệp cấu hình tồn tại
 if [ -f /etc/sysctl.d/99-antiddos-mc.conf ]; then
@@ -45,15 +68,12 @@ if [ -f /etc/sysctl.d/99-antiddos-mc.conf ]; then
 fi
 sysctl --system >/dev/null 2>&1
 
-# 4. GIẢI PHÓNG FIREWALL NFTABLES (V2)
-echo -e "[4/5] Đang xóa bỏ các bảng Nftables (V2)..."
+# 5. GIẢI PHÓNG FIREWALL (NFTABLES & IPTABLES)
+echo -e "[5/5] Đang giải phóng các bộ lọc mạng (Firewall)..."
+# Xóa bảng Nftables XDP và Bypass
 nft delete table netdev antiddos_v2 2>/dev/null
 nft delete table ip raw_bypass 2>/dev/null
-echo "      -> Đã xóa bảng Nftables Ingress và Raw Bypass."
-
-# 5. GIẢI PHÓNG FIREWALL IPTABLES & IPSET (V1)
-echo -e "[5/5] Đang dọn dẹp Iptables và Ipset (V1)..."
-# Flush các chain chính liên quan
+# Flush Iptables
 iptables -F INPUT 2>/dev/null
 iptables -F DOCKER-USER 2>/dev/null
 
@@ -69,6 +89,13 @@ if command -v netfilter-persistent &> /dev/null; then
     echo "      -> Đã lưu lại trạng thái Firewall sạch."
 fi
 
-echo -e "\n\033[1;32m[✔] HOÀN TẤT GỠ CÀI ĐẶT!\033[0m"
+# Gỡ XDP khỏi interface (Nên làm để giải phóng Driver)
+INTERFACE=$(ip -o -4 route get 8.8.8.8 | sed -nr 's/.*dev ([^ ]+).*/\1/p' 2>/dev/null)
+if [ -n "$INTERFACE" ]; then
+    ip link set dev "$INTERFACE" xdp off 2>/dev/null
+    echo "      -> Đã gỡ bỏ XDP khỏi interface $INTERFACE."
+fi
+
+echo -e "\n\033[1;32m[✔] HOÀN TẤT GỠ CÀI ĐẶT TOÀN DIỆN (V1, V2, V3)!\033[0m"
 echo -e "Hệ thống của bạn đã trở về trạng thái mặc định ban đầu."
 echo -e "Cảm ơn bạn đã sử dụng dịch vụ!\n"
