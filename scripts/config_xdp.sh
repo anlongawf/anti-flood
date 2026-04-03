@@ -106,6 +106,14 @@ cat <<EOF >> "$XDP_CONF_FILE"
 EOF
 
 # 3. THIẾT LẬP GEO-SHIELD LAYER (NFTABLES)
+GEO_SHIELD_ENABLE=$(cat /etc/xdpfw/geo_shield_enabled.txt 2>/dev/null || echo "y")
+
+if [[ ! "$GEO_SHIELD_ENABLE" =~ ^[yY]$ ]]; then
+    echo -e "\033[1;32m[✔] Geo-Shield: CHẾ ĐỘ MULTI-PROXY (Dành cho Hosting). Đã bỏ qua chặn cứng IP Nước Ngoài.\033[0m"
+    nft delete table inet antiddos_geo 2>/dev/null
+    exit 0
+fi
+
 echo "[+] Đang kích hoạt Geo-Shield Level 2 (VN/JP Nftables)..."
 # Tạo Table Nftables để lọc IP Quốc Gia cho Game Ports
 nft delete table inet antiddos_geo 2>/dev/null

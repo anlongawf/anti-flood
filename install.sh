@@ -27,11 +27,13 @@ read -r -p "[?] Nhập dải Port Pterodactyl của bạn (Ví dụ: 30000-35000
 
 read -r -p "[?] Nhập Discord Webhook URL (Để trống nếu không dùng): " DISCORD_WEBHOOK
 read -r -p "[?] Nhập IP của các Server Backend bên ngoài (Ví dụ: 1.2.3.4,5.6.7.8): " EXTERNAL_BACKENDS
+read -r -p "[?] Kích hoạt Geo-Shield (Chặn hoàn toàn IP Nước Ngoài) cho Cổng Game? (y/n): " GEO_SHIELD_ENABLE
 
 mkdir -p /etc/xdpfw
 echo "$PTERO_POOL" > /etc/xdpfw/pterodactyl_pool.txt
 echo "$DISCORD_WEBHOOK" > /etc/xdpfw/webhook.txt
 echo "$EXTERNAL_BACKENDS" > /etc/xdpfw/external_backends.txt
+echo "$GEO_SHIELD_ENABLE" > /etc/xdpfw/geo_shield_enabled.txt
 
 # 4. GIAI ĐOẠN 2: BIÊN DỊCH VÀ CÀI ĐẶT XDP-FIREWALL
 echo -e "\n\033[1;36m[2/5] Đang build giáp Driver XDP (Gamemann Core)...\033[0m"
@@ -41,7 +43,7 @@ bash "$SCRIPT_DIR/scripts/compile_xdp.sh"
 echo -e "\n\033[1;36m[3/5] Đang kích hoạt Geo-Shield (VN/JP) & Config Generator...\033[0m"
 # Cập nhật danh sách IP VN và JP
 bash "$SCRIPT_DIR/scripts/update-geoip.sh"
-# Tạo cấu hình XDP
+# Tạo cấu hình XDP & Nftables
 bash "$SCRIPT_DIR/scripts/config_xdp.sh"
 
 # 6. GIAI ĐOẠN 4: KẾT NỐI FAIL2BAN GUARDIAN
