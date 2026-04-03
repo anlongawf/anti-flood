@@ -74,6 +74,7 @@ sysctl --system >/dev/null 2>&1
 echo -e "[5/5] Đang giải phóng các bộ lọc mạng (Firewall)..."
 # Xóa bảng Nftables XDP và Bypass
 nft delete table netdev antiddos_v2 2>/dev/null
+nft delete table inet antiddos_geo 2>/dev/null
 nft delete table ip raw_bypass 2>/dev/null
 # Flush Iptables
 iptables -F INPUT 2>/dev/null
