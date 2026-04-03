@@ -114,7 +114,17 @@ nft add chain inet antiddos_geo prerouting { type filter hook prerouting priorit
 
 # Tạo Set trong Nftables từ IPSET (Đồng bộ)
 nft add set inet antiddos_geo allow_countries { type ipv4_addr \; flags interval \; }
+
+# 3.1. WHITELIST NỘI BỘ (Luôn cho phép Localhost và LAN)
+nft add rule inet antiddos_geo prerouting ip saddr { 127.0.0.1/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } counter accept comment \"whitelist_internal\"
+
+# Nạp IP từ IPSET vào NFT Set
 ipset list allow_countries | grep -E '^[0-9]' | xargs -n1 -I {} nft add element inet antiddos_geo allow_countries { {} } 2>/dev/null
+
+# Kiểm tra xem Set có dữ liệu không. Nếu rỗng thì không bật DROP để tránh khóa toàn bộ Server.
+HAS_GEO=$(nft list set inet antiddos_geo allow_countries | grep -c "element")
+if [ "$HAS_GEO" -gt 0 ]; then
+    echo "      -> Geo-Shield: Đã nạp thành công $HAS_GEO dải IP. Đang kích hoạt chặn Quốc tế..."
 
 # Áp dụng luật DROP: Nếu không thuộc VN/JP mà truy cập Port Game/Pool thì DROP ngay
 if [ -n "$ACTIVE_PTERO_PORTS" ]; then
@@ -122,8 +132,11 @@ if [ -n "$ACTIVE_PTERO_PORTS" ]; then
 fi
 
 # Chặn nốt dải Pool Pterodactyl
-nft add rule inet antiddos_geo prerouting ip saddr != @allow_countries udp dport { $PTERO_POOL } counter drop comment \"geo_block_pool\"
-nft add rule inet antiddos_geo prerouting ip saddr != @allow_countries tcp dport { $PTERO_POOL } counter drop comment \"geo_block_pool\"
+    nft add rule inet antiddos_geo prerouting ip saddr != @allow_countries udp dport { $PTERO_POOL } counter drop comment \"geo_block_pool\"
+    nft add rule inet antiddos_geo prerouting ip saddr != @allow_countries tcp dport { $PTERO_POOL } counter drop comment \"geo_block_pool\"
+else
+    echo -e "\033[1;33m[!] CẢNH BÁO: Geo-IP Set rỗng! Đã tạm tắt chặn Quốc tế để tránh lỗi kết nối.\033[0m"
+fi
 
 # Tinh chỉnh Kernel (Bổ trợ)
 sysctl -w net.ipv4.conf.all.rp_filter=1 >/dev/null

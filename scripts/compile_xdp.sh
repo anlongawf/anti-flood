@@ -8,7 +8,7 @@ echo -e "\033[1;36m[+] Đang chuẩn bị môi trường biên dịch XDP (Clang
 # 1. FIX APT VÀ CÀI ĐẶT DEPENDENCIES
 apt-get update -y
 apt --fix-broken install -y
-apt-get install -y m4 build-essential clang llvm libelf-dev pkg-config zlib1g-dev gcc-multilib git curl bc
+apt-get install -y m4 build-essential clang llvm libelf-dev pkg-config zlib1g-dev gcc-multilib git curl bc ipset nftables
 
 # 2. CLONE MÃ NGUỒN (GAMEMANN XDP-FIREWALL)
 BUILD_DIR="/tmp/xdp_build"
