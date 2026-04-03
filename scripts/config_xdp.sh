@@ -39,7 +39,7 @@ filters = (
     {
         enabled = true,
         action = 1,          // Allow Whitelist IPs
-        src_ip = [ $WHITELIST_IPS ]
+        src_ip = [ $(echo "$WHITELIST_IPS" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/') ]
     },
 
     // -------------------------------------------------------------
@@ -120,11 +120,6 @@ nft add rule inet antiddos_geo prerouting ip saddr { 127.0.0.1/8, 10.0.0.0/8, 17
 
 # Nạp IP từ IPSET vào NFT Set
 ipset list allow_countries | grep -E '^[0-9]' | xargs -n1 -I {} nft add element inet antiddos_geo allow_countries { {} } 2>/dev/null
-
-# Kiểm tra xem Set có dữ liệu không. Nếu rỗng thì không bật DROP để tránh khóa toàn bộ Server.
-HAS_GEO=$(nft list set inet antiddos_geo allow_countries | grep -c "element")
-if [ "$HAS_GEO" -gt 0 ]; then
-    echo "      -> Geo-Shield: Đã nạp thành công $HAS_GEO dải IP. Đang kích hoạt chặn Quốc tế..."
 
 # Áp dụng luật DROP: Nếu không thuộc VN/JP mà truy cập Port Game/Pool thì DROP ngay
 if [ -n "$ACTIVE_PTERO_PORTS" ]; then

@@ -47,10 +47,12 @@ get_whitelist_ips() {
     
     # Tự động lấy IP của người đang SSH hiện tại (Tránh tự khóa mình)
     local SSH_IP=$(echo $SSH_CONNECTION | awk '{print $1}')
-    if [ -n "$SSH_IP" ]; then
-        WHITELIST="$WHITELIST,$SSH_IP"
-    fi
-    
+    [ -n "$SSH_IP" ] && WHITELIST="$WHITELIST,$SSH_IP"
+
+    # Tự động lấy IP Public của Server (Tránh Proxy loopback timeout)
+    local PUBLIC_IP=$(curl -s https://api.ipify.org 2>/dev/null)
+    [ -n "$PUBLIC_IP" ] && WHITELIST="$WHITELIST,$PUBLIC_IP"
+
     echo "$WHITELIST"
 }
 

@@ -39,7 +39,7 @@ PPS=$DIFF_PKTS
 
 # 3. THỐNG KÊ CHẶN (XDP & NFTABLES)
 XDP_DROPS=$(tail -n 100 /var/log/xdpfw.log 2>/dev/null | grep -c "Dropped")
-NFT_DROPS=$(nft list table netdev antiddos_v2 2>/dev/null | grep "packets" | awk '{sum+=$5} END {print sum}')
+NFT_DROPS=$(nft list table inet antiddos_geo 2>/dev/null | grep "packets" | awk '{sum+=$5} END {print sum}')
 [ -z "$NFT_DROPS" ] && NFT_DROPS=0
 
 # 4. KẾT NỐI & HỆ THỐNG
