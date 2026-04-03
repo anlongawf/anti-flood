@@ -83,7 +83,7 @@ cat <<EOF >> "$XDP_CONF_FILE"
         enabled = true,
         action = 0, block_time = 120, log = true,
         udp_enabled = true, tcp_enabled = true,
-        udp_dport = [ $ACTIVE_PTERO_PORTS ], tcp_dport = [ $ACTIVE_PTERO_PORTS ],
+        udp_dport = "$ACTIVE_PTERO_PORTS", tcp_dport = "$ACTIVE_PTERO_PORTS",
         flow_pps = 10000,    // Nâng giới hạn cho Hosting (10k PPS)
         ip_pps = 20000,      // Chống Multi-thread Attack (20k PPS)
         flow_bps = 50000000  // 50MB/s (400 Mbps) - Cực kỳ thoải mái cho Chunk Loading
@@ -91,7 +91,7 @@ cat <<EOF >> "$XDP_CONF_FILE"
     {
         enabled = true, action = 1, 
         udp_enabled = true, tcp_enabled = true,
-        udp_dport = [ $ACTIVE_PTERO_PORTS ], tcp_dport = [ $ACTIVE_PTERO_PORTS ]
+        udp_dport = "$ACTIVE_PTERO_PORTS", tcp_dport = "$ACTIVE_PTERO_PORTS"
     },
 EOF
 fi
