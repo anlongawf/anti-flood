@@ -69,7 +69,7 @@ fi
 
 # 7. GỬI DISCORD
 HOSTNAME=$(hostname)
-IP_SERVER=$(curl -s https://api.ipify.org || echo "Unknown")
+IP_SERVER=$(curl -s --max-time 5 https://api.ipify.org || echo "Unknown")
 TIMESTAMP=$(date '+%H:%M:%S - %d/%m/%Y')
 
 PAYLOAD=$(cat <<EOF

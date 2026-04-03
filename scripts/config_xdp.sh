@@ -36,12 +36,25 @@ filters = (
     // -------------------------------------------------------------
     // NHÓM 0: WHITELIST IP TIN CẬY (Không bao giờ Ban)
     // -------------------------------------------------------------
+EOF
+
+# Phải tách từng IP ra thành các rule riêng vì xdpfw không hỗ trợ array IP trong src_ip
+IFS=',' read -ra ADDR <<< "$WHITELIST_IPS"
+for ip in "${ADDR[@]}"; do
+    # Loại bỏ khoảng trắng (nếu có) và bỏ qua giá trị rỗng
+    ip=$(echo "$ip" | tr -d '[:space:]')
+    [ -z "$ip" ] && continue
+    
+cat <<EOF >> "$XDP_CONF_FILE"
     {
         enabled = true,
         action = 1,          // Allow Whitelist IPs
-        src_ip = [ $(echo "$WHITELIST_IPS" | sed 's/,/","/g' | sed 's/^/"/' | sed 's/$/"/') ]
+        src_ip = "$ip"
     },
+EOF
+done
 
+cat <<EOF >> "$XDP_CONF_FILE"
     // -------------------------------------------------------------
     // NHÓM 1: WHITELIST ADMIN PORTS (SSH, Wings, DB...)
     // -------------------------------------------------------------
@@ -69,14 +82,16 @@ cat <<EOF >> "$XDP_CONF_FILE"
     {
         enabled = true,
         action = 0, block_time = 120, log = true,
-        udp_enabled = true, udp_dport = [ $ACTIVE_PTERO_PORTS ],
-        flow_pps = 300,      // Game Minecraft/Bedrock PPS thực tế
-        ip_pps = 2000,       // Chống Multi-thread Attack
-        flow_bps = 500000    // 500KB/s
+        udp_enabled = true, tcp_enabled = true,
+        udp_dport = [ $ACTIVE_PTERO_PORTS ], tcp_dport = [ $ACTIVE_PTERO_PORTS ],
+        flow_pps = 10000,    // Nâng giới hạn cho Hosting (10k PPS)
+        ip_pps = 20000,      // Chống Multi-thread Attack (20k PPS)
+        flow_bps = 50000000  // 50MB/s (400 Mbps) - Cực kỳ thoải mái cho Chunk Loading
     },
     {
-        enabled = true,
-        action = 1, udp_enabled = true, udp_dport = [ $ACTIVE_PTERO_PORTS ]
+        enabled = true, action = 1, 
+        udp_enabled = true, tcp_enabled = true,
+        udp_dport = [ $ACTIVE_PTERO_PORTS ], tcp_dport = [ $ACTIVE_PTERO_PORTS ]
     },
 EOF
 fi
@@ -89,15 +104,16 @@ cat <<EOF >> "$XDP_CONF_FILE"
     {
         enabled = true,
         action = 0, block_time = 60, log = false,
-        udp_enabled = true, udp_dport = "$PTERO_POOL",
-        flow_pps = 1000,     // Nới lỏng hơn cho pool dự phòng
-        ip_pps = 5000
+        udp_enabled = true, tcp_enabled = true,
+        udp_dport = "$PTERO_POOL", tcp_dport = "$PTERO_POOL",
+        flow_pps = 5000,     // Nới lỏng hơn cho pool dự phòng
+        ip_pps = 10000,
+        flow_bps = 25000000  // 200 Mbps
     },
     {
-        enabled = true, action = 1, udp_enabled = true, udp_dport = "$PTERO_POOL"
-    },
-    {
-        enabled = true, action = 1, tcp_enabled = true, tcp_dport = "$PTERO_POOL"
+        enabled = true, action = 1, 
+        udp_enabled = true, tcp_enabled = true,
+        udp_dport = "$PTERO_POOL", tcp_dport = "$PTERO_POOL"
     },
 
     // Default Allow cho Admin và các gói tin không khớp (để đẩy lên nftables)
