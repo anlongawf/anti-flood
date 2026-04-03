@@ -53,6 +53,10 @@ get_whitelist_ips() {
     local PUBLIC_IP=$(curl -s https://api.ipify.org 2>/dev/null)
     [ -n "$PUBLIC_IP" ] && WHITELIST="$WHITELIST,$PUBLIC_IP"
 
+    # Nạp thêm IP Backend từ bên ngoài (Nếu người dùng cấu hình khi cài đặt)
+    local EXTERNAL_BACKENDS=$(cat /etc/xdpfw/external_backends.txt 2>/dev/null)
+    [ -n "$EXTERNAL_BACKENDS" ] && WHITELIST="$WHITELIST,$EXTERNAL_BACKENDS"
+
     echo "$WHITELIST"
 }
 

@@ -26,10 +26,12 @@ read -r -p "[?] Nhập dải Port Pterodactyl của bạn (Ví dụ: 30000-35000
 [ -z "$PTERO_POOL" ] && PTERO_POOL="30000-30100"
 
 read -r -p "[?] Nhập Discord Webhook URL (Để trống nếu không dùng): " DISCORD_WEBHOOK
+read -r -p "[?] Nhập IP của các Server Backend bên ngoài (Ví dụ: 1.2.3.4,5.6.7.8): " EXTERNAL_BACKENDS
 
 mkdir -p /etc/xdpfw
 echo "$PTERO_POOL" > /etc/xdpfw/pterodactyl_pool.txt
 echo "$DISCORD_WEBHOOK" > /etc/xdpfw/webhook.txt
+echo "$EXTERNAL_BACKENDS" > /etc/xdpfw/external_backends.txt
 
 # 4. GIAI ĐOẠN 2: BIÊN DỊCH VÀ CÀI ĐẶT XDP-FIREWALL
 echo -e "\n\033[1;36m[2/5] Đang build giáp Driver XDP (Gamemann Core)...\033[0m"
